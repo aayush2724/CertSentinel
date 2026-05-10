@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Certificate Report – CertSentinel</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body>
+<header>
+  <nav>
+    <h1>🛡️ CertSentinel</h1>
+    <a href="/history">History</a>
+  </nav>
+</header>
+<main>
+  <h2>Report #{{ record.id }}</h2>
+  <p><strong>File:</strong> {{ record.filename | e }}</p>
+  <p><strong>Submitted:</strong> {{ record.submitted_at[:19].replace('T', ' ') }}</p>
+
+  <div class="result-card">
+    <div class="status-badge badge-{{ record.status.lower() | e }}">{{ record.status | e }}</div>
+    <p><strong>Confidence:</strong> {{ (record.confidence * 100) | round(1) }}%</p>
+
+    <h3>Issues Found</h3>
+    <ul>
+      {# record.reasons is already a Python list (decoded by _row_to_dict) #}
+      {% if record.reasons %}
+        {% for reason in record.reasons %}
+          <li>{{ reason | e }}</li>
+        {% endfor %}
+      {% else %}
+        <li>No issues detected.</li>
+      {% endif %}
+    </ul>
+
+    <h3>Extracted Fields</h3>
+    <table class="info-table">
+      <tbody>
+        {% for key, value in record.extracted_fields.items() %}
+          {% if value %}
+          <tr>
+            <th>{{ key | replace('_', ' ') | title | e }}</th>
+            <td>
+              {% if value is iterable and value is not string %}
+                {{ value | join(', ') | e }}
+              {% else %}
+                {{ value | e }}
+              {% endif %}
+            </td>
+          </tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <a href="/history" class="btn-primary" style="display:inline-block;margin-top:1.5rem;">← Back to History</a>
+</main>
+</body>
+</html>

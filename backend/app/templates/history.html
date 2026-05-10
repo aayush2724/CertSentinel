@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Verification History – MedCert Verifier</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body>
+<header>
+  <nav>
+    <h1>🏥 MedCert Verifier</h1>
+    <a href="/">New Verification</a>
+  </nav>
+</header>
+<main>
+  <h2>Verification History</h2>
+  {% if records %}
+  <table class="info-table">
+    <thead>
+      <tr>
+        <th>#</th><th>File</th><th>Status</th><th>Confidence</th><th>Date</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in records %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td>{{ r.filename }}</td>
+        <td><span class="badge badge-{{ r.status.lower() }}">{{ r.status }}</span></td>
+        <td>{{ (r.confidence * 100) | round(1) }}%</td>
+        <td>{{ r.submitted_at[:10] }}</td>
+        <td><a href="/report/{{ r.id }}">View</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No records yet. <a href="/">Verify your first certificate.</a></p>
+  {% endif %}
+</main>
+</body>
+</html>
