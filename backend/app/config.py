@@ -1,64 +1,62 @@
-"""
-Application Configuration
-Environment-driven settings for dev and production.
-"""
 import os
+from datetime import timedelta
+from dotenv import load_dotenv
 
+load_dotenv()
 
-class Config:
-    # Security: SECRET_KEY MUST be set via environment in production.
-    # A random fallback is provided only for local dev convenience.
-    SECRET_KEY = os.environ.get("SECRET_KEY", os.urandom(32).hex())
+BASE_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "..", "uploads")
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
-    ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "pdf"}
-
-    DATABASE_PATH = os.environ.get(
-        "DATABASE_PATH",
-        os.path.join(os.path.dirname(__file__), "..", "certificates.db"),
-    )
-
-    MODEL_PATH = os.path.join(
-        os.path.dirname(__file__), "..", "ml", "models", "classifier.pkl"
-    )
-
-    CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
-    CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
-
-    # ML Config
-    MODEL_VERSION = "1.0.0"
-    CONFIDENCE_THRESHOLD_GENUINE = 0.80
-    CONFIDENCE_THRESHOLD_SUSPICIOUS = 0.50
-
+class BaseConfig:
     # Security
-    API_KEY = os.environ.get("API_KEY", "dev-key-12345")
-    RATELIMIT_DEFAULT = "200 per day; 50 per hour"
-    RATELIMIT_STORAGE_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-
-    DEBUG = False
-    TESTING = False
-
-
-class DevelopmentConfig(Config):
-    DEBUG = True
-
-
-class ProductionConfig(Config):
-    DEBUG = False
-    # In production, SECRET_KEY should be set via environment.
-    # If missing, it will fall back to the base Config's random key or None here.
-    # To keep the 'intentional crash' behavior, we could check it in create_app.
     SECRET_KEY = os.environ.get("SECRET_KEY")
+    if not SECRET_KEY:
+        raise ValueError("No SECRET_KEY set for Flask application")
+        
+    JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", SECRET_KEY)
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=8)
 
+    # Database — PostgreSQL
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        "DATABASE_URL", "sqlite:///./certsentinel_dev.db"
+    )
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,       # reconnect on stale connections
+        "pool_size": 10,
+        "max_overflow": 20,
+    }
 
-class TestingConfig(Config):
+    # File uploads
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+    MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10 MB
+    ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "pdf"}
+    ALLOWED_MIME_TYPES = {"image/png", "image/jpeg", "application/pdf"}
+
+    # ML
+    MODEL_PATH = os.environ.get("MODEL_PATH", os.path.join(BASE_DIR, "ml/models/classifier.pkl"))
+    MODEL_VERSION = os.environ.get("MODEL_VERSION", "v1.0.0")
+    CONFIDENCE_THRESHOLD_GENUINE = 0.75
+    CONFIDENCE_THRESHOLD_SUSPICIOUS = 0.45
+
+    # Celery / Redis (async jobs)
+    CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+
+    # Rate limiting
+    RATELIMIT_DEFAULT = "100 per hour"
+    RATELIMIT_UPLOAD = "20 per hour"
+
+    # CORS
+    CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
+
+class DevelopmentConfig(BaseConfig):
+    DEBUG = True
+    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-do-not-use-in-prod")
+
+class ProductionConfig(BaseConfig):
+    DEBUG = False
+
+class TestingConfig(BaseConfig):
     TESTING = True
-    DATABASE_PATH = ":memory:"
-
-
-config_by_name = {
-    "development": DevelopmentConfig,
-    "production": ProductionConfig,
-    "testing": TestingConfig,
-}
+    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    CELERY_TASK_ALWAYS_EAGER = True  # run tasks synchronously in tests

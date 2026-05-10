@@ -1,41 +1,63 @@
 import os
-import logging
-from celery import shared_task
+from celery import Celery
 from flask import current_app
-from app.services.verification_service import VerificationService
-from app.exceptions import CertSentinelError
+from ..database import db
+from ..services.verification_service import VerificationService
 
-logger = logging.getLogger(__name__)
+def make_celery(app):
+    celery = Celery(
+        app.import_name,
+        broker=app.config["CELERY_BROKER_URL"],
+        backend=app.config["CELERY_RESULT_BACKEND"]
+    )
+    celery.conf.update(app.config)
 
-@shared_task(bind=True)
-def verify_certificate_task(self, filepath, filename):
-    """Celery task using the refactored VerificationService."""
+    class ContextTask(celery.Task):
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return self.run(*args, **kwargs)
+
+    celery.Task = ContextTask
+    return celery
+
+# The celery instance will be attached to the app in __init__.py
+# Here we define the tasks
+
+from celery import shared_task
+
+@shared_task(bind=True, max_retries=2, default_retry_delay=5)
+def verify_certificate_task(self, filepath, original_filename, user_id, ip_address):
+    """
+    Background task wrapping VerificationService.verify().
+    """
     try:
-        db = current_app.extensions["db"]
-        model_path = current_app.config["MODEL_PATH"]
-        
+        # We need the app context to use the service
+        from flask import current_app
         service = VerificationService(
-            db=db, 
-            model_path=model_path,
-            config=current_app.config
+            db.session,
+            current_app.config['MODEL_PATH'],
+            current_app.config['MODEL_VERSION']
         )
         
-        result = service.verify(filepath, filename)
-        return result
+        record = service.verify(
+            filepath,
+            original_filename,
+            user_id=user_id,
+            ip_address=ip_address
+        )
+        
+        return str(record.id)
 
-    except CertSentinelError as exc:
-        return {
-            "error": str(exc),
-            "code": exc.code,
-            "retryable": exc.retryable
-        }
     except Exception as exc:
-        logger.exception("Task failure")
-        return {
-            "error": "Internal task error",
-            "code": "ERR_INTERNAL",
-            "retryable": False
-        }
-    finally:
-        if os.path.exists(filepath):
-            os.remove(filepath)
+        # If it's a transient error, retry
+        try:
+            self.retry(exc=exc)
+        except Exception:
+            # If retries exhausted or non-retryable error
+            # Mark record as ERROR in DB if possible (requires more logic to track pending records)
+            raise exc
+        finally:
+            # Cleanup temp file on final failure if needed
+            # (Usually done in the route or here)
+            if os.path.exists(filepath):
+                os.remove(filepath)

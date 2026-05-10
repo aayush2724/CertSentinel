@@ -5,11 +5,15 @@ from flask_cors import CORS
 from celery import Celery, Task
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_jwt_extended import JWTManager
+from flask_bcrypt import Bcrypt
 
-from app.config import Config
-from app.middleware.error_handler import register_error_handlers
+from .database import db
+from .config import DevelopmentConfig
 
 limiter = Limiter(key_func=get_remote_address)
+jwt = JWTManager()
+bcrypt = Bcrypt()
 
 def celery_init_app(app: Flask) -> Celery:
     class FlaskTask(Task):
@@ -23,31 +27,32 @@ def celery_init_app(app: Flask) -> Celery:
     app.extensions["celery"] = celery_app
     return celery_app
 
-def create_app(config_class=Config):
+def create_app(config_class=DevelopmentConfig):
     app = Flask(__name__, static_folder=None)
     app.config.from_object(config_class)
 
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    # Initialize Extensions
+    db.init_app(app)
+    bcrypt.init_app(app)
+    CORS(app, origins=app.config["CORS_ORIGINS"])
     celery_init_app(app)
     limiter.init_app(app)
+    jwt.init_app(app)
     
     # Ensure upload directory exists
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-    # Database setup
-    from database.db_handler import DBHandler
-    app.extensions["db"] = DBHandler(app.config["DATABASE_PATH"])
-
-    # Middleware
+    # Global Error Handlers
+    from .errors import register_error_handlers
     register_error_handlers(app)
 
     # Blueprints
-    from app.routes.certificates import bp as certificates_bp
-    from app.routes.auth import bp as auth_bp
-    from app.routes.admin import bp as admin_bp
+    from .routes.certificates import bp as certificates_bp
+    from .routes.auth import bp as auth_bp
+    from .routes.admin import bp as admin_bp
     
-    app.register_blueprint(certificates_bp)
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(admin_bp)
+    app.register_blueprint(certificates_bp, url_prefix='/api/certificates')
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    app.register_blueprint(admin_bp, url_prefix='/api/admin')
 
     return app
