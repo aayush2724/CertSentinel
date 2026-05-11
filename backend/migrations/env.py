@@ -11,7 +11,7 @@ from alembic import context
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.database import db
-from app.models import User, VerificationRecord, AuditLog, BatchJob
+from app.models import AuditLog, BatchJob, Permission, User, UserPermission, VerificationRecord
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

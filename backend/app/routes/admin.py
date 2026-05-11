@@ -1,31 +1,73 @@
-from flask import Blueprint, jsonify, current_app
-from app.middleware.auth import token_required
+from flask import Blueprint, jsonify, request
+from flask_jwt_extended import get_jwt, jwt_required
+from sqlalchemy import func
 
-bp = Blueprint("admin", __name__, url_prefix="/api/admin")
+from ..database import db
+from ..models import AuditLog, VerificationRecord
+
+bp = Blueprint("admin", __name__)
+
+
+def require_admin():
+    claims = get_jwt()
+    if claims.get("role") != "admin":
+        from ..errors import AuthError, FORBIDDEN
+
+        raise AuthError(FORBIDDEN, "Admin privileges are required", status_code=403)
+
+
+@bp.get("/audit-logs")
+@jwt_required()
+def audit_logs():
+    require_admin()
+    limit = min(request.args.get("limit", 100, type=int), 500)
+    logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(limit).all()
+    return jsonify([
+        {
+            "id": str(log.id),
+            "user_id": str(log.user_id) if log.user_id else None,
+            "action": log.action,
+            "resource_type": log.resource_type,
+            "resource_id": str(log.resource_id) if log.resource_id else None,
+            "ip_address": log.ip_address,
+            "confidence_threshold_used": log.confidence_threshold_used,
+            "model_version": log.model_version,
+            "details": log.details or {},
+            "created_at": log.created_at.isoformat(),
+        }
+        for log in logs
+    ])
+
 
 @bp.get("/records")
-@token_required
-def get_records():
-    db = current_app.extensions["db"]
-    records = db.get_all_records()
-    return jsonify(records)
+@jwt_required()
+def records():
+    require_admin()
+    limit = min(request.args.get("limit", 100, type=int), 500)
+    rows = VerificationRecord.query.order_by(VerificationRecord.submitted_at.desc()).limit(limit).all()
+    return jsonify([
+        {
+            "id": str(row.id),
+            "user_id": str(row.user_id) if row.user_id else None,
+            "filename": row.original_filename,
+            "status": row.status,
+            "confidence": row.confidence,
+            "confidence_threshold_used": row.confidence_threshold_used,
+            "model_version": row.model_version,
+            "processing_time_ms": row.processing_time_ms,
+            "submitted_at": row.submitted_at.isoformat(),
+        }
+        for row in rows
+    ])
 
-@bp.get("/records/<int:record_id>")
-@token_required
-def get_record(record_id):
-    db = current_app.extensions["db"]
-    record = db.get_record(record_id)
-    if not record:
-        return jsonify({"error": "Record not found"}), 404
-    return jsonify(record)
 
 @bp.get("/stats")
-@token_required
-def get_stats():
-    # Placeholder for dashboard stats
-    return jsonify({
-        "total_verifications": 1250,
-        "genuine_count": 980,
-        "suspicious_count": 150,
-        "fake_count": 120
-    })
+@jwt_required()
+def stats():
+    require_admin()
+    total = db.session.query(func.count(VerificationRecord.id)).scalar()
+    by_status = {
+        status: db.session.query(func.count(VerificationRecord.id)).filter_by(status=status).scalar()
+        for status in ("GENUINE", "SUSPICIOUS", "FAKE", "ERROR", "PENDING")
+    }
+    return jsonify({"total_verifications": total, "by_status": by_status})

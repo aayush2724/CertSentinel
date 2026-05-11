@@ -30,6 +30,8 @@ def celery_init_app(app: Flask) -> Celery:
 def create_app(config_class=DevelopmentConfig):
     app = Flask(__name__, static_folder=None)
     app.config.from_object(config_class)
+    if not app.config.get("DEBUG") and not app.config.get("SECRET_KEY"):
+        raise ValueError("No SECRET_KEY set for Flask application")
 
     # Initialize Extensions
     db.init_app(app)

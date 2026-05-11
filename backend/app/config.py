@@ -9,9 +9,6 @@ BASE_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 class BaseConfig:
     # Security
     SECRET_KEY = os.environ.get("SECRET_KEY")
-    if not SECRET_KEY:
-        raise ValueError("No SECRET_KEY set for Flask application")
-        
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", SECRET_KEY)
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=8)
 
@@ -20,11 +17,7 @@ class BaseConfig:
         "DATABASE_URL", "sqlite:///./certsentinel_dev.db"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ENGINE_OPTIONS = {
-        "pool_pre_ping": True,       # reconnect on stale connections
-        "pool_size": 10,
-        "max_overflow": 20,
-    }
+    SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
 
     # File uploads
     UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
@@ -52,6 +45,7 @@ class BaseConfig:
 class DevelopmentConfig(BaseConfig):
     DEBUG = True
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-do-not-use-in-prod")
+    JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", SECRET_KEY)
 
 class ProductionConfig(BaseConfig):
     DEBUG = False

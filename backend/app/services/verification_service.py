@@ -1,7 +1,6 @@
+import os
 import time
-import uuid
 from concurrent.futures import ThreadPoolExecutor
-from flask import current_app
 from ..repositories.verification_repository import VerificationRepository
 from ..repositories.audit_repository import AuditRepository
 from ..errors import ProcessingError, OCR_EMPTY_RESULT, MODEL_INFERENCE_FAILED
@@ -22,6 +21,7 @@ class VerificationService:
         self.audit = AuditRepository(db_session)
         self.classifier = CertificateClassifier.get_instance(model_path)
         self.model_version = model_version
+        self.thresholds = getattr(self.classifier, "thresholds", {"genuine": 0.75, "suspicious": 0.45})
         
         # Initialize engines once
         self.processor = DocumentProcessor()
@@ -47,11 +47,17 @@ class VerificationService:
                 "extracted_text": results["extracted_text"],
                 "status": results["classification"]["status"],
                 "confidence": results["classification"]["confidence"],
+                "confidence_threshold_used": self._threshold_for_status(results["classification"]["status"]),
                 "reasons": results["classification"]["reasons"],
                 "extracted_fields": results["analysis"]["text"].get("extracted_fields", {}),
                 "text_score": results["analysis"]["text"].get("score", 0),
                 "image_score": results["analysis"]["image"].get("score", 0),
                 "ml_features": results["features"],
+                "feature_extraction_metadata": {
+                    "pipeline_timings": results["timings"],
+                    "feature_count": len(results["features"]),
+                    "text_length": len(results["extracted_text"] or ""),
+                },
                 "model_version": self.model_version,
                 "processing_time_ms": processing_time_ms
             }
@@ -65,7 +71,14 @@ class VerificationService:
                 resource_type='VerificationRecord',
                 resource_id=record.id,
                 ip_address=ip_address,
-                details={"status": record.status, "confidence": record.confidence}
+                confidence_threshold_used=record.confidence_threshold_used,
+                model_version=record.model_version,
+                details={
+                    "status": record.status,
+                    "confidence": record.confidence,
+                    "processing_time_ms": record.processing_time_ms,
+                    "pipeline_timings": results["timings"],
+                }
             )
             
             return record
@@ -76,6 +89,7 @@ class VerificationService:
                 user_id=user_id,
                 action='VERIFY_FAILED',
                 ip_address=ip_address,
+                model_version=self.model_version,
                 details={"error": str(e), "filename": original_filename}
             )
             if isinstance(e, ProcessingError):
@@ -123,6 +137,13 @@ class VerificationService:
             "classification": classification,
             "timings": timings
         }
+
+    def _threshold_for_status(self, status: str) -> float:
+        if status == "GENUINE":
+            return float(self.thresholds.get("genuine", 0.75))
+        if status == "SUSPICIOUS":
+            return float(self.thresholds.get("suspicious", 0.45))
+        return 0.0
 
     def get_record(self, record_id: str) -> VerificationRecord:
         record = self.repo.get_by_id(record_id)

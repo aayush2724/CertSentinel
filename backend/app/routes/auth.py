@@ -7,7 +7,7 @@ from flask_jwt_extended import (
 from flask_bcrypt import Bcrypt
 from ..database import db
 from ..models import User
-from ..errors import AuthError, UNAUTHORIZED
+from ..errors import AuthError, FileValidationError, UNAUTHORIZED, VALIDATION_ERROR
 from ..repositories.audit_repository import AuditRepository
 
 bp = Blueprint('auth', __name__)
@@ -23,13 +23,17 @@ except Exception:
 @bp.route('/register', methods=['POST'])
 def register():
     audit_repo = AuditRepository(db.session)
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     email = data.get('email')
     password = data.get('password')
     role = data.get('role', 'viewer')
 
+    if not email or not password:
+        raise FileValidationError(VALIDATION_ERROR, "Email and password are required")
+    if role not in {"admin", "verifier", "viewer"}:
+        raise FileValidationError(VALIDATION_ERROR, "Invalid role", {"allowed": ["admin", "verifier", "viewer"]})
     if User.query.filter_by(email=email).first():
-        return jsonify({"error": "Email already registered"}), 409
+        raise FileValidationError(VALIDATION_ERROR, "Email already registered")
 
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
     user = User(email=email, password_hash=hashed_password, role=role)
@@ -47,16 +51,21 @@ def register():
             "role": user.role,
             "access_token": access_token
         }), 201
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        return jsonify({"error": "Registration failed"}), 500
+        from ..errors import ProcessingError, DB_SAVE_FAILED
+
+        raise ProcessingError(DB_SAVE_FAILED, "Registration failed")
 
 @bp.route('/login', methods=['POST'])
 def login():
     audit_repo = AuditRepository(db.session)
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     email = data.get('email')
     password = data.get('password')
+
+    if not email or not password:
+        raise AuthError(UNAUTHORIZED, "Invalid credentials")
 
     user = User.query.filter_by(email=email).first()
     

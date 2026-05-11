@@ -7,8 +7,8 @@ class AuditRepository:
     def __init__(self, db_session=None):
         self.session = db_session or db.session
 
-    def log(self, user_id, action, resource_type=None, 
-            resource_id=None, ip_address=None, details=None) -> AuditLog:
+    def log(self, user_id, action, resource_type=None, resource_id=None, ip_address=None,
+            confidence_threshold_used=None, model_version=None, details=None) -> AuditLog:
         """Create an audit log entry. Never raises — swallows exceptions to avoid breaking main request flow."""
         try:
             entry = AuditLog(
@@ -17,6 +17,8 @@ class AuditRepository:
                 resource_type=resource_type,
                 resource_id=resource_id,
                 ip_address=ip_address,
+                confidence_threshold_used=confidence_threshold_used,
+                model_version=model_version,
                 details=details
             )
             self.session.add(entry)
