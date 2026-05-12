@@ -49,6 +49,7 @@ class DevelopmentConfig(BaseConfig):
     DEBUG = True
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-do-not-use-in-prod")
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", SECRET_KEY)
+    CELERY_TASK_ALWAYS_EAGER = True
 
 class ProductionConfig(BaseConfig):
     DEBUG = False
