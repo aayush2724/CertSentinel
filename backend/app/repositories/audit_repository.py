@@ -1,4 +1,5 @@
 import sys
+import uuid
 from typing import List
 from ..models import AuditLog
 from ..database import db
@@ -11,6 +12,10 @@ class AuditRepository:
             confidence_threshold_used=None, model_version=None, details=None) -> AuditLog:
         """Create an audit log entry. Never raises — swallows exceptions to avoid breaking main request flow."""
         try:
+            if user_id is not None:
+                user_id = uuid.UUID(str(user_id))
+            if resource_id is not None:
+                resource_id = uuid.UUID(str(resource_id))
             entry = AuditLog(
                 user_id=user_id,
                 action=action,

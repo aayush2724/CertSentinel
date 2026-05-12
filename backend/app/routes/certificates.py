@@ -17,7 +17,7 @@ def get_verification_service():
     )
 
 @bp.route('/verify', methods=['POST'])
-@jwt_required(optional=True)
+@jwt_required()
 def verify():
     if 'certificate' not in request.files:
         raise FileValidationError("MISSING_FILE", "No file part in the request")
@@ -62,7 +62,7 @@ def verify():
             os.remove(temp_path)
 
 @bp.route('/verify-async', methods=['POST'])
-@jwt_required(optional=True)
+@jwt_required()
 def verify_async():
     if 'certificate' not in request.files:
         raise FileValidationError("MISSING_FILE", "No file part in the request")
@@ -90,6 +90,7 @@ def verify_async():
     }), 202
 
 @bp.route('/verify-async/<task_id>/status', methods=['GET'])
+@jwt_required()
 def get_task_status(task_id):
     from celery.result import AsyncResult
     celery_app = current_app.extensions.get('celery')
@@ -128,8 +129,9 @@ def list_records():
 @bp.route('/<record_id>', methods=['GET'])
 @jwt_required()
 def get_record(record_id):
+    user_id = get_jwt_identity()
     service = get_verification_service()
-    record = service.get_record(record_id)
+    record = service.get_record(record_id, user_id=user_id)
     return jsonify({
         "id": str(record.id),
         "status": record.status,
@@ -155,6 +157,7 @@ def get_stats():
 @bp.route('/<record_id>/export', methods=['GET'])
 @jwt_required()
 def export_record(record_id):
+    user_id = get_jwt_identity()
     service = get_verification_service()
-    record = service.get_record(record_id)
+    record = service.get_record(record_id, user_id=user_id)
     return jsonify({"report_id": str(record.id), "status": record.status}), 200

@@ -145,8 +145,8 @@ class VerificationService:
             return float(self.thresholds.get("suspicious", 0.45))
         return 0.0
 
-    def get_record(self, record_id: str) -> VerificationRecord:
-        record = self.repo.get_by_id(record_id)
+    def get_record(self, record_id: str, user_id: str = None) -> VerificationRecord:
+        record = self.repo.get_by_id_for_user(record_id, user_id) if user_id else self.repo.get_by_id(record_id)
         if not record:
             from ..errors import NotFoundError, RECORD_NOT_FOUND
             raise NotFoundError(RECORD_NOT_FOUND, f"Record {record_id} not found")

@@ -10,6 +10,11 @@ class VerificationRepository:
         self.session = db_session or db.session
 
     def create(self, data: dict) -> VerificationRecord:
+        if data.get("user_id") is not None:
+            try:
+                data = {**data, "user_id": uuid.UUID(str(data["user_id"]))}
+            except (ValueError, TypeError, AttributeError):
+                data = {**data, "user_id": None}
         record = VerificationRecord(**data)
         self.session.add(record)
         self.session.commit()
@@ -21,6 +26,14 @@ class VerificationRepository:
         except (ValueError, TypeError, AttributeError):
             return None
         return self.session.query(VerificationRecord).filter_by(id=record_uuid).first()
+
+    def get_by_id_for_user(self, record_id: str, user_id: str) -> Optional[VerificationRecord]:
+        try:
+            record_uuid = uuid.UUID(str(record_id))
+            user_uuid = uuid.UUID(str(user_id))
+        except (ValueError, TypeError, AttributeError):
+            return None
+        return self.session.query(VerificationRecord).filter_by(id=record_uuid, user_id=user_uuid).first()
 
     def get_all(self, user_id=None, limit=100, offset=0, 
                 status_filter=None, date_from=None, date_to=None) -> List[VerificationRecord]:

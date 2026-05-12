@@ -25,11 +25,13 @@ function AnimatedRoutes() {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={
-          <motion.div {...pageVariants}>
-            <Suspense fallback={<PageLoader />}>
-              <Home />
-            </Suspense>
-          </motion.div>
+          <ProtectedRoute>
+            <motion.div {...pageVariants}>
+              <Suspense fallback={<PageLoader />}>
+                <Home />
+              </Suspense>
+            </motion.div>
+          </ProtectedRoute>
         } />
         <Route path="/login" element={
           <motion.div {...pageVariants}>
@@ -39,11 +41,13 @@ function AnimatedRoutes() {
           </motion.div>
         } />
         <Route path="/report/:id" element={
-          <motion.div {...pageVariants}>
-            <Suspense fallback={<PageLoader />}>
-              <Report />
-            </Suspense>
-          </motion.div>
+          <ProtectedRoute>
+            <motion.div {...pageVariants}>
+              <Suspense fallback={<PageLoader />}>
+                <Report />
+              </Suspense>
+            </motion.div>
+          </ProtectedRoute>
         } />
         <Route path="/dashboard" element={
           <ProtectedRoute requiredRole="admin">
