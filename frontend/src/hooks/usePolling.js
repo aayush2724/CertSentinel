@@ -1,28 +1,33 @@
-import { useEffect } from 'react';
-import { getTaskStatus } from '../services/api';
+import { useState, useEffect, useRef } from 'react';
+import { certificateAPI } from '../services/api';
 
-export const usePolling = (taskId, onComplete, onError, interval = 2000) => {
+export function usePolling(taskId, { enabled = true, interval = 2000 } = {}) {
+  const [status, setStatus]   = useState(null);
+  const [recordId, setRecordId] = useState(null);
+  const [error, setError]     = useState(null);
+  const timerRef = useRef(null);
+
   useEffect(() => {
-    let pollInterval;
+    if (!taskId || !enabled) return;
 
-    if (taskId) {
-      pollInterval = setInterval(async () => {
-        try {
-          const { data } = await getTaskStatus(taskId);
-          if (data.status === 'SUCCESS') {
-            onComplete(data.result);
-            clearInterval(pollInterval);
-          } else if (data.status === 'FAILURE') {
-            onError(data.error || 'Task failed', data.code);
-            clearInterval(pollInterval);
-          }
-        } catch {
-          onError('Connection lost during status check');
-          clearInterval(pollInterval);
-        }
-      }, interval);
-    }
+    const poll = async () => {
+      try {
+        const res = await certificateAPI.pollStatus(taskId);
+        const { status: s, record_id, error: errMsg } = res.data;
+        setStatus(s);
+        if (s === 'DONE')  { setRecordId(record_id); clearInterval(timerRef.current); }
+        if (s === 'ERROR') { setError(errMsg || 'Processing failed.'); clearInterval(timerRef.current); }
+      } catch {
+        setError('Lost connection. Please refresh.');
+        clearInterval(timerRef.current);
+      }
+    };
 
-    return () => clearInterval(pollInterval);
-  }, [taskId, onComplete, onError, interval]);
-};
+    poll();
+    timerRef.current = setInterval(poll, interval);
+
+    return () => clearInterval(timerRef.current);
+  }, [taskId, enabled, interval]);
+
+  return { status, recordId, error };
+}

@@ -1,4 +1,5 @@
 import os
+import uuid
 import redis
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import (
@@ -90,7 +91,12 @@ def login():
 @jwt_required()
 def me():
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
+    try:
+        user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+    except (ValueError, AttributeError):
+        raise AuthError(UNAUTHORIZED, "Invalid user ID")
+    
+    user = User.query.get(user_uuid)
     if not user:
         raise AuthError(UNAUTHORIZED, "User not found")
     return jsonify({

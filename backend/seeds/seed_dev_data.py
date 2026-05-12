@@ -6,6 +6,7 @@ from flask_bcrypt import Bcrypt
 
 # Add project root to sys.path
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from app import create_app
 from app.database import db
