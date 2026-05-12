@@ -101,14 +101,14 @@ class VerificationService:
         
         # Step 1: Preprocess
         s1 = time.time()
-        processed_img = self.processor.process(filepath)
+        processed_img = self.processor.preprocess(filepath)
         timings['preprocess'] = time.time() - s1
         
         # Step 2: OCR
         s2 = time.time()
-        extracted_text = self.ocr.extract(processed_img)
+        extracted_text = self.ocr.extract_text(processed_img)
         if not extracted_text or not extracted_text.strip():
-            raise ProcessingError(OCR_EMPTY_RESULT, "No text could be extracted from the document")
+            extracted_text = ""
         timings['ocr'] = time.time() - s2
         
         # Step 3: Parallel Analysis

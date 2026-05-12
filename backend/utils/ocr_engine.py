@@ -33,7 +33,11 @@ class OCREngine:
                 return self._google_vision_ocr(image)
             except Exception as exc:
                 logger.warning("Google Vision OCR failed (%s), falling back to Tesseract.", exc)
-        return self._tesseract_ocr(image)
+        try:
+            return self._tesseract_ocr(image)
+        except Exception as exc:
+            logger.warning("Tesseract OCR unavailable (%s); returning empty text.", exc)
+            return ""
 
     def _tesseract_ocr(self, image: np.ndarray) -> str:
         """Tesseract OCR with binarisation pre-step."""

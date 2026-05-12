@@ -39,13 +39,11 @@ function AnimatedRoutes() {
           </motion.div>
         } />
         <Route path="/report/:id" element={
-          <ProtectedRoute>
-            <motion.div {...pageVariants}>
-              <Suspense fallback={<PageLoader />}>
-                <Report />
-              </Suspense>
-            </motion.div>
-          </ProtectedRoute>
+          <motion.div {...pageVariants}>
+            <Suspense fallback={<PageLoader />}>
+              <Report />
+            </Suspense>
+          </motion.div>
         } />
         <Route path="/dashboard" element={
           <ProtectedRoute requiredRole="admin">

@@ -1,3 +1,4 @@
+import uuid
 from typing import List, Optional
 from datetime import datetime
 from sqlalchemy import func, or_
@@ -15,7 +16,11 @@ class VerificationRepository:
         return record
 
     def get_by_id(self, record_id: str) -> Optional[VerificationRecord]:
-        return self.session.query(VerificationRecord).filter_by(id=record_id).first()
+        try:
+            record_uuid = uuid.UUID(str(record_id))
+        except (ValueError, TypeError, AttributeError):
+            return None
+        return self.session.query(VerificationRecord).filter_by(id=record_uuid).first()
 
     def get_all(self, user_id=None, limit=100, offset=0, 
                 status_filter=None, date_from=None, date_to=None) -> List[VerificationRecord]:

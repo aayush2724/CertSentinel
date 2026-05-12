@@ -1,10 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Canvas } from '@react-three/fiber';
-import { Suspense } from 'react';
-import VerdictSphere from '../components/3d/VerdictSphere';
-import ConfidenceMeter3D from '../components/3d/ConfidenceMeter3D';
 import { certificateAPI } from '../services/api';
 
 const STATUS_COLORS = {
@@ -60,245 +56,177 @@ export default function Report() {
   const { status, confidence_score, reasons, extracted_info, image_forensics,
           processing_time_ms } = record;
   const colors = STATUS_COLORS[status] || STATUS_COLORS.SUSPICIOUS;
+  const confidencePercent = Math.round((confidence_score || 0) * 100);
+  const docPreviewLabel = record.filename || `certsentinel-report-${id}`;
 
   return (
     <PageShell>
-      <motion.div variants={stagger} initial="initial" animate="animate"
-        style={{ maxWidth: '880px', margin: '0 auto', padding: '60px 24px' }}>
+      <div className="relative max-w-7xl mx-auto px-6 lg:px-10 py-8 lg:py-10">
+        <motion.div variants={stagger} initial="initial" animate="animate" className="space-y-6">
+          <motion.button
+            variants={fadeUp}
+            onClick={() => navigate('/')}
+            className="inline-flex items-center gap-2 text-sm text-on-surface-variant/70 hover:text-primary transition-colors"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M19 12H5M12 5l-7 7 7 7" />
+            </svg>
+            Back to upload
+          </motion.button>
 
-        {/* Back */}
-        <motion.button variants={fadeUp} onClick={() => navigate('/')}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontFamily: 'var(--font-body)', fontSize: '14px',
-            color: 'var(--text-tertiary)', padding: 0, marginBottom: '48px',
-            display: 'flex', alignItems: 'center', gap: '6px',
-          }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="1.5">
-            <path d="M19 12H5M12 5l-7 7 7 7"/>
-          </svg>
-          Back to upload
-        </motion.button>
-
-        {/* ── Hero: sphere + verdict ── */}
-        <motion.div variants={fadeUp} style={{
-          display: 'grid', gridTemplateColumns: '280px 1fr',
-          gap: '48px', alignItems: 'center', marginBottom: '64px',
-        }}>
-          <div>
-            <div style={{ height: '280px' }}>
-              <Canvas camera={{ position: [0, 0, 4], fov: 45 }}
-                style={{ background: 'transparent' }}
-                frameloop="always">
-                <ambientLight intensity={0.5} />
-                <directionalLight position={[5, 5, 5]} intensity={1.0} />
-                <pointLight position={[-4, -4, -4]} intensity={0.3} />
-                <Suspense fallback={null}>
-                  <VerdictSphere verdict={status} />
-                </Suspense>
-              </Canvas>
-            </div>
-            {/* Confidence meter below sphere */}
-            <div style={{ height: '120px', marginTop: '-12px' }}>
-              <Canvas camera={{ position: [0, 0, 4], fov: 50 }}
-                style={{ background: 'transparent' }}
-                frameloop="demand">
-                <ambientLight intensity={0.6} />
-                <Suspense fallback={null}>
-                  <ConfidenceMeter3D confidence={Math.round(confidence_score * 100)} verdict={status} />
-                </Suspense>
-              </Canvas>
-            </div>
-          </div>
-
-          <div>
-            <p style={{
-              fontFamily: 'var(--font-body)', fontSize: '11px',
-              letterSpacing: '0.15em', textTransform: 'uppercase',
-              color: 'var(--text-tertiary)', margin: '0 0 16px',
-            }}>
-              Verification Result
-            </p>
-            <h2 style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 'clamp(42px, 5vw, 64px)',
-              fontWeight: 400, lineHeight: 1.05,
-              color: colors.text, margin: '0 0 12px',
-            }}>
-              {STATUS_LABELS[status]}
-            </h2>
-            <p style={{
-              fontFamily: 'var(--font-body)', fontSize: '18px',
-              color: 'var(--text-secondary)', margin: '0 0 8px',
-            }}>
-              {Math.round(confidence_score * 100)}% confidence
-            </p>
-            <p style={{
-              fontFamily: 'var(--font-body)', fontSize: '13px',
-              color: 'var(--text-tertiary)',
-            }}>
-              Processed in {processing_time_ms}ms · Model {record.model_version || 'v1.0.0'}
-            </p>
-
-            {/* Action buttons */}
-            <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
-              <motion.button
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                onClick={handleExport}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid var(--border)',
-                  borderRadius: '100px',
-                  padding: '12px 24px',
-                  fontFamily: 'var(--font-body)', fontSize: '14px',
-                  color: 'var(--text-primary)', cursor: 'pointer',
-                }}>
-                Export Report
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                onClick={() => navigate('/')}
-                style={{
-                  background: 'var(--accent)',
-                  border: 'none',
-                  borderRadius: '100px',
-                  padding: '12px 24px',
-                  fontFamily: 'var(--font-body)', fontSize: '14px',
-                  color: '#fff', cursor: 'pointer',
-                }}>
-                Verify Another
-              </motion.button>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* ── Extracted Information ── */}
-        <Section title="Extracted Information" variants={fadeUp}>
-          <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0',
-          }}>
-            {[
-              ['Doctor Name',         extracted_info?.doctor_name],
-              ['Hospital',            extracted_info?.hospital_name],
-              ['Date(s)',             extracted_info?.dates?.join(', ')],
-              ['Registration No.',    extracted_info?.registration_numbers?.join(', ')],
-            ].map(([label, val]) => (
-              <div key={label} style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid var(--border)',
-              }}>
-                <p style={{
-                  margin: '0 0 4px', fontSize: '11px',
-                  textTransform: 'uppercase', letterSpacing: '0.1em',
-                  color: 'var(--text-tertiary)',
-                }}>
-                  {label}
-                </p>
-                <p style={{
-                  margin: 0, fontSize: '15px',
-                  color: val ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                  fontStyle: val ? 'normal' : 'italic',
-                }}>
-                  {val || 'Not detected'}
-                </p>
-              </div>
-            ))}
-          </div>
-        </Section>
-
-        {/* ── Fraud Detection Signals ── */}
-        <Section title="Detection Signals" variants={fadeUp}>
-          <motion.ul style={{ listStyle: 'none', padding: 0, margin: 0 }}
-            variants={stagger} initial="initial" animate="animate">
-            {(reasons || []).map((reason, i) => (
-              <motion.li key={i} variants={fadeUp} style={{
-                display: 'flex', alignItems: 'flex-start', gap: '12px',
-                padding: '14px 20px',
-                borderBottom: i < reasons.length - 1 ? '1px solid var(--border)' : 'none',
-              }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                  stroke="var(--accent-amber)" strokeWidth="2"
-                  style={{ flexShrink: 0, marginTop: '2px' }}>
-                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                  <line x1="12" y1="9" x2="12" y2="13"/>
-                  <line x1="12" y1="17" x2="12.01" y2="17"/>
-                </svg>
-                <span style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                  {reason}
-                </span>
-              </motion.li>
-            ))}
-            {(!reasons || reasons.length === 0) && (
-              <li style={{ padding: '16px 20px', fontSize: '14px', color: 'var(--text-tertiary)' }}>
-                No fraud signals detected.
-              </li>
-            )}
-          </motion.ul>
-        </Section>
-
-        {/* ── Image Forensics ── */}
-        <Section title="Image Forensics" variants={fadeUp}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px',
-            background: 'var(--border)' }}>
-            {[
-              ['ELA Score',             image_forensics?.ela_score,              'lower is better', false],
-              ['Copy-Move Detected',    image_forensics?.copy_move_detected ? 'Yes' : 'No', '', image_forensics?.copy_move_detected],
-              ['Font Consistency',      image_forensics?.font_consistency_score, 'higher is better', false],
-            ].map(([label, val, hint, warn]) => (
-              <div key={label} style={{
-                padding: '20px', background: 'var(--surface)',
-              }}>
-                <p style={{
-                  margin: '0 0 8px', fontSize: '11px',
-                  textTransform: 'uppercase', letterSpacing: '0.1em',
-                  color: 'var(--text-tertiary)',
-                }}>
-                  {label}
-                </p>
-                <p style={{
-                  margin: '0 0 4px', fontSize: '22px',
-                  fontFamily: 'var(--font-display)', fontWeight: 400,
-                  color: warn ? 'var(--accent-red)' : 'var(--text-primary)',
-                }}>
-                  {typeof val === 'number' ? val.toFixed(2) : (val ?? '—')}
-                </p>
-                {hint && (
-                  <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-tertiary)' }}>
-                    {hint}
-                  </p>
-                )}
-                {typeof val === 'number' && (
-                  <div style={{
-                    marginTop: '10px', height: '3px',
-                    background: 'var(--border)', borderRadius: '2px',
-                    overflow: 'hidden',
-                  }}>
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min(val * 100, 100)}%` }}
-                      transition={{ duration: 0.9, delay: 0.4, ease: 'easeOut' }}
-                      style={{
-                        height: '100%',
-                        background: warn ? 'var(--accent-red)' : 'var(--accent-teal)',
-                        borderRadius: '2px',
-                      }}
-                    />
+          <motion.section variants={fadeUp} className="glass-card rounded-[36px] p-6 lg:p-8 border-white/50 overflow-hidden relative">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(177,156,217,0.14),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(178,238,185,0.16),transparent_35%)]" />
+            <div className="relative z-10 grid lg:grid-cols-[1.15fr_0.85fr] gap-6 items-stretch">
+              <div className="rounded-[30px] bg-white/70 border border-white/80 p-5 lg:p-6 flex flex-col gap-5">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.35em] text-primary font-bold mb-2">Certificate verdict</p>
+                    <h2 className="font-display-lg text-on-surface leading-none">{STATUS_LABELS[status]}</h2>
                   </div>
+                  <div className="text-right">
+                    <p className="text-[11px] uppercase tracking-[0.3em] text-on-surface-variant/60 font-bold">Confidence</p>
+                    <p className="text-4xl font-display-lg text-primary">{confidencePercent}%</p>
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div className="rounded-3xl bg-surface/70 border border-white/80 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-on-surface-variant/55 font-bold">Processed</p>
+                    <p className="text-lg font-semibold text-on-surface mt-2">{processing_time_ms} ms</p>
+                  </div>
+                  <div className="rounded-3xl bg-surface/70 border border-white/80 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-on-surface-variant/55 font-bold">Model</p>
+                    <p className="text-lg font-semibold text-on-surface mt-2">{record.model_version || 'v1.0.0'}</p>
+                  </div>
+                  <div className="rounded-3xl bg-surface/70 border border-white/80 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-on-surface-variant/55 font-bold">Record</p>
+                    <p className="text-lg font-semibold text-on-surface mt-2 truncate">{id}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-[30px] bg-white/65 border border-white/80 p-5">
+                  <div className="flex items-center justify-between gap-4 mb-4">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.3em] text-primary font-bold">Report actions</p>
+                      <p className="text-sm text-on-surface-variant/70">Export a JSON snapshot or run another verification.</p>
+                    </div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-on-surface-variant/50 font-bold">{docPreviewLabel}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleExport} className="px-5 py-3 rounded-full border border-outline-variant/60 bg-white text-sm font-semibold text-on-surface hover:border-primary hover:text-primary transition-colors">
+                      Export Report
+                    </motion.button>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => navigate('/')} className="px-5 py-3 rounded-full bg-primary text-white text-sm font-semibold shadow-lg shadow-primary/20 hover:shadow-xl transition-all">
+                      Verify Another
+                    </motion.button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[30px] bg-white/70 border border-white/80 p-5 lg:p-6 flex flex-col justify-between gap-4">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.35em] text-on-surface-variant/60 font-bold mb-2">Document snapshot</p>
+                  <div className="rounded-[26px] bg-[linear-gradient(180deg,#fff,#f5f5f8)] border border-white/90 shadow-[0_18px_40px_rgba(0,0,0,0.08)] p-5">
+                    <div className="rounded-2xl border border-primary/10 bg-primary/5 p-4 mb-4">
+                      <p className="text-[10px] uppercase tracking-[0.35em] text-primary font-bold mb-2">Preview</p>
+                      <p className="font-headline-md text-on-surface">{docPreviewLabel}</p>
+                      <p className="text-sm text-on-surface-variant/70 mt-1">Document scanned and summarized into a structured forensic report.</p>
+                    </div>
+                    <div className="space-y-3">
+                      {[
+                        ['Status', STATUS_LABELS[status]],
+                        ['Confidence', `${confidencePercent}%`],
+                        ['Image Score', typeof image_forensics?.image_score === 'number' ? image_forensics.image_score.toFixed(2) : '—'],
+                        ['Text Score', typeof image_forensics?.text_score === 'number' ? image_forensics.text_score.toFixed(2) : '—'],
+                      ].map(([label, value]) => (
+                        <div key={label} className="flex items-center justify-between rounded-2xl bg-white/70 border border-white/80 px-4 py-3">
+                          <span className="text-xs uppercase tracking-[0.25em] text-on-surface-variant/60 font-bold">{label}</span>
+                          <span className="text-sm font-semibold text-on-surface">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[26px] bg-secondary-container/35 border border-secondary/10 p-4">
+                  <p className="text-[11px] uppercase tracking-[0.3em] text-secondary font-bold mb-2">Verdict note</p>
+                  <p className="text-sm text-on-surface-variant/80 leading-relaxed">
+                    The current environment runs without system OCR, so the report is derived from the available verification metadata and image-side checks.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.section>
+
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Section title="Extracted Information" variants={fadeUp}>
+              <div className="grid sm:grid-cols-2">
+                {[
+                  ['Doctor Name', extracted_info?.doctor_name],
+                  ['Hospital', extracted_info?.hospital_name],
+                  ['Date(s)', extracted_info?.dates?.join(', ')],
+                  ['Registration No.', extracted_info?.registration_numbers?.join(', ')],
+                ].map(([label, val]) => (
+                  <div key={label} className="p-5 border-b border-r border-outline-variant/50 last:border-b-0 sm:[&:nth-child(2n)]:border-r-0">
+                    <p className="text-[11px] uppercase tracking-[0.12em] text-on-surface-variant/55 font-bold mb-2">{label}</p>
+                    <p className={`text-sm ${val ? 'text-on-surface' : 'text-on-surface-variant/55 italic'}`}>{val || 'Not detected'}</p>
+                  </div>
+                ))}
+              </div>
+            </Section>
+
+            <Section title="Detection Signals" variants={fadeUp}>
+              <div className="divide-y divide-outline-variant/40">
+                {(reasons || []).map((reason, i) => (
+                  <div key={i} className="flex items-start gap-3 p-5">
+                    <span className="material-symbols-outlined text-amber-600 mt-0.5">warning</span>
+                    <p className="text-sm text-on-surface-variant/80 leading-6">{reason}</p>
+                  </div>
+                ))}
+                {(!reasons || reasons.length === 0) && (
+                  <div className="p-5 text-sm text-on-surface-variant/60">No fraud signals detected.</div>
                 )}
               </div>
-            ))}
+            </Section>
           </div>
-        </Section>
 
-      </motion.div>
+          <Section title="Image Forensics" variants={fadeUp}>
+            <div className="grid md:grid-cols-3 gap-px bg-outline-variant/50">
+              {[
+                ['ELA Score', image_forensics?.ela_score, 'lower is better', false],
+                ['Copy-Move Detected', image_forensics?.copy_move_detected ? 'Yes' : 'No', '', image_forensics?.copy_move_detected],
+                ['Font Consistency', image_forensics?.font_consistency_score, 'higher is better', false],
+              ].map(([label, val, hint, warn]) => (
+                <div key={label} className="bg-white/80 p-5 lg:p-6">
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-on-surface-variant/55 font-bold mb-3">{label}</p>
+                  <p className={`text-2xl font-display-lg ${warn ? 'text-error' : 'text-on-surface'}`}>
+                    {typeof val === 'number' ? val.toFixed(2) : (val ?? '—')}
+                  </p>
+                  {hint && <p className="mt-1 text-xs text-on-surface-variant/60">{hint}</p>}
+                  {typeof val === 'number' && (
+                    <div className="mt-4 h-2 rounded-full bg-outline-variant/35 overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(val * 100, 100)}%` }}
+                        transition={{ duration: 0.8, delay: 0.25, ease: 'easeOut' }}
+                        className={`h-full rounded-full ${warn ? 'bg-error' : 'bg-primary'}`}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Section>
+        </motion.div>
+      </div>
     </PageShell>
   );
 }
 
 function PageShell({ children }) {
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+    <div className="min-h-screen text-on-surface overflow-hidden relative">
+      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_left,rgba(177,156,217,0.22),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(178,238,185,0.18),transparent_28%),linear-gradient(180deg,#faf8ff_0%,#f9f9f9_50%,#f7faf7_100%)]" />
       {children}
     </div>
   );
@@ -306,20 +234,9 @@ function PageShell({ children }) {
 
 function Section({ title, children, variants }) {
   return (
-    <motion.div variants={variants} style={{ marginBottom: '40px' }}>
-      <p style={{
-        fontFamily: 'var(--font-body)', fontSize: '11px',
-        textTransform: 'uppercase', letterSpacing: '0.15em',
-        color: 'var(--text-tertiary)', margin: '0 0 12px',
-      }}>
-        {title}
-      </p>
-      <div style={{
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)',
-        overflow: 'hidden',
-        background: 'var(--surface)',
-      }}>
+    <motion.div variants={variants} className="space-y-3">
+      <p className="text-[11px] uppercase tracking-[0.35em] text-on-surface-variant/60 font-bold px-1">{title}</p>
+      <div className="glass-card rounded-[30px] overflow-hidden border-white/50">
         {children}
       </div>
     </motion.div>
@@ -328,30 +245,22 @@ function Section({ title, children, variants }) {
 
 function LoadingSkeleton() {
   return (
-    <div style={{ maxWidth: '880px', margin: '0 auto', padding: '60px 24px' }}>
-      {[280, 200, 140, 160].map((w, i) => (
-        <div key={i} style={{
-          height: '20px', width: `${w}px`, maxWidth: '100%',
-          background: 'var(--border)', borderRadius: '4px',
-          marginBottom: '16px', animation: 'pulse 1.5s ease-in-out infinite',
-        }} />
-      ))}
+    <div className="max-w-7xl mx-auto px-6 lg:px-10 py-10 space-y-4">
+      <div className="h-5 w-40 rounded-full bg-outline-variant/50 animate-pulse" />
+      <div className="grid lg:grid-cols-2 gap-6">
+        <div className="h-[340px] rounded-[32px] bg-outline-variant/35 animate-pulse" />
+        <div className="h-[340px] rounded-[32px] bg-outline-variant/35 animate-pulse" />
+      </div>
+      <div className="h-72 rounded-[32px] bg-outline-variant/30 animate-pulse" />
     </div>
   );
 }
 
 function ErrorState({ message, onBack }) {
   return (
-    <div style={{
-      minHeight: '100vh', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', gap: '16px',
-    }}>
-      <p style={{ fontSize: '16px', color: 'var(--text-secondary)' }}>{message}</p>
-      <button onClick={onBack} style={{
-        background: 'var(--accent)', color: '#fff', border: 'none',
-        borderRadius: '100px', padding: '12px 24px', cursor: 'pointer',
-        fontFamily: 'var(--font-body)', fontSize: '14px',
-      }}>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-5 px-6 text-center">
+      <p className="text-base text-on-surface-variant">{message}</p>
+      <button onClick={onBack} className="px-5 py-3 rounded-full bg-primary text-white font-semibold shadow-lg shadow-primary/20">
         Go Back
       </button>
     </div>

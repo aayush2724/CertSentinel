@@ -130,7 +130,21 @@ def list_records():
 def get_record(record_id):
     service = get_verification_service()
     record = service.get_record(record_id)
-    return jsonify({"id": str(record.id), "status": record.status}), 200
+    return jsonify({
+        "id": str(record.id),
+        "status": record.status,
+        "confidence_score": record.confidence,
+        "reasons": record.reasons,
+        "extracted_info": record.extracted_fields,
+        "image_forensics": {
+            "text_score": record.text_score,
+            "image_score": record.image_score,
+            "ml_features": record.ml_features,
+        },
+        "processing_time_ms": record.processing_time_ms,
+        "model_version": record.model_version,
+        "filename": record.original_filename,
+    }), 200
 
 @bp.route('/stats', methods=['GET'])
 @jwt_required()
