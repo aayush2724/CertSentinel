@@ -17,26 +17,41 @@ def seed_data():
     bcrypt = Bcrypt(app)
     
     with app.app_context():
-        # Create admin user
-        admin = User.query.filter_by(email='admin@certsentinel.dev').first()
-        if not admin:
-            admin = User(
-                email='admin@certsentinel.dev',
+        # Create admin user (medverify.dev)
+        admin_mv = User.query.filter_by(email='admin@medverify.dev').first()
+        if not admin_mv:
+            admin_mv = User(
+                email='admin@medverify.dev',
                 password_hash=bcrypt.generate_password_hash('admin123').decode('utf-8'),
                 role='admin'
             )
-            db.session.add(admin)
+            db.session.add(admin_mv)
         
-        # Create verifier user
-        verifier = User.query.filter_by(email='verifier@certsentinel.dev').first()
-        if not verifier:
-            verifier = User(
-                email='verifier@certsentinel.dev',
+        # Create verifier user (medverify.dev)
+        verifier_mv = User.query.filter_by(email='verifier@medverify.dev').first()
+        if not verifier_mv:
+            verifier_mv = User(
+                email='verifier@medverify.dev',
                 password_hash=bcrypt.generate_password_hash('verifier123').decode('utf-8'),
                 role='verifier'
             )
-            db.session.add(verifier)
+            db.session.add(verifier_mv)
+
+        # Create viewer user (medverify.dev)
+        viewer_mv = User.query.filter_by(email='viewer@medverify.dev').first()
+        if not viewer_mv:
+            viewer_mv = User(
+                email='viewer@medverify.dev',
+                password_hash=bcrypt.generate_password_hash('viewer123').decode('utf-8'),
+                role='viewer'
+            )
+            db.session.add(viewer_mv)
         
+        db.session.commit()
+        
+        # Clear existing verification records and audit logs to prevent duplicates
+        VerificationRecord.query.delete()
+        AuditLog.query.delete()
         db.session.commit()
         
         # Create Verification Records
@@ -50,14 +65,14 @@ def seed_data():
                 confidence=0.95 if status == 'GENUINE' else 0.45,
                 reasons=['Reason A', 'Reason B'] if status != 'GENUINE' else [],
                 extracted_fields={'doctor': 'Dr. Test', 'hospital': 'Test Hospital'},
-                user_id=verifier.id
+                user_id=verifier_mv.id
             )
             db.session.add(record)
             db.session.flush() # Get the ID
             
             # Add Audit Log
             audit = AuditLog(
-                user_id=verifier.id,
+                user_id=verifier_mv.id,
                 action='VERIFY',
                 resource_type='VerificationRecord',
                 resource_id=record.id,

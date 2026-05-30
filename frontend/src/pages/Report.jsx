@@ -44,6 +44,7 @@ export default function Report() {
   const [record, setRecord] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showFilePreview, setShowFilePreview] = useState(false);
 
   useEffect(() => {
     certificateAPI.getById(id)
@@ -54,6 +55,7 @@ export default function Report() {
 
   if (loading) return <PageShell><LoadingSkeleton /></PageShell>;
   if (error) return <PageShell><ErrorState message={error} onBack={() => navigate('/vault')} /></PageShell>;
+  if (!record) return <PageShell><ErrorState message="Certificate record could not be loaded." onBack={() => navigate('/vault')} /></PageShell>;
 
   const { status, confidence_score, reasons, extracted_info, image_forensics, processing_time_ms } = record;
   
@@ -163,6 +165,13 @@ export default function Report() {
               {/* Right Column: Actions - Hidden during PDF Print */}
               <div className="print:hidden flex flex-col gap-2.5 w-full">
                 <button 
+                  onClick={() => setShowFilePreview(true)} 
+                  className="w-full px-5 py-3 rounded-xl bg-white/60 border border-white text-on-surface text-xs font-bold shadow-sm hover:bg-primary-container/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">visibility</span>
+                  View Original Certificate
+                </button>
+                <button 
                   onClick={() => window.print()} 
                   className="w-full px-5 py-3 rounded-xl bg-gradient-to-tr from-primary to-primary-container text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer inner-glow"
                 >
@@ -216,14 +225,32 @@ export default function Report() {
             </div>
             
             <div className="divide-y divide-white/20">
-              {(reasons || []).map((reason, i) => (
-                <div key={i} className="flex items-start gap-3 p-4 hover:bg-white/10 transition-colors">
-                  <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="material-symbols-outlined text-amber-600 text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>
+              {(reasons || []).map((reason, i) => {
+                const translated = translateReason(reason);
+                const isAnomaly = ['ela', 'noise', 'copy-move', 'font', 'future date', 'software', 'editing software', 'tampering', 'forgery'].some(keyword => 
+                  reason.toLowerCase().includes(keyword)
+                );
+                
+                return (
+                  <div key={i} className="flex items-start gap-3.5 p-4 hover:bg-white/10 transition-colors">
+                    {isAnomaly ? (
+                      <div className="w-7 h-7 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="material-symbols-outlined text-red-600 text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>gpp_maybe</span>
+                      </div>
+                    ) : (
+                      <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                        <span className="material-symbols-outlined text-primary text-[16px]">info</span>
+                      </div>
+                    )}
+                    <div className="space-y-0.5 text-left">
+                      <p className={`text-[9px] font-extrabold uppercase tracking-wider ${isAnomaly ? 'text-red-700' : 'text-primary'}`}>
+                        {isAnomaly ? 'Tamper Signal Detected' : 'Content Audit Check'}
+                      </p>
+                      <p className="text-xs text-on-surface-variant/80 font-medium leading-relaxed mt-0.5">{translated}</p>
+                    </div>
                   </div>
-                  <p className="text-xs text-on-surface-variant/80 font-medium leading-relaxed mt-0.5">{reason}</p>
-                </div>
-              ))}
+                );
+              })}
               
               {(!reasons || reasons.length === 0) && (
                 <div className="p-8 flex flex-col items-center justify-center text-center gap-3">
@@ -241,62 +268,78 @@ export default function Report() {
 
         </div>
 
-        {/* Digital Forensic Analysis Section */}
-        <motion.div variants={fadeUp} initial="initial" animate="animate" className="glass-card inner-glow rounded-3xl overflow-hidden border-white/50 text-left print:border-none print:shadow-none print:bg-white">
-          <div className="px-5 py-3.5 border-b border-white/20 bg-white/20 flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary text-[18px]">biometric_profile</span>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface">Digital Forensic Diagnostics</h3>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-px bg-outline-variant/30 print:bg-transparent">
-            {[
-              {
-                label: 'Copy-Move Detected',
-                val: copyMove === true ? 'Yes' : (copyMove === false ? 'No' : 'No'),
-                hint: 'Checks clone tampering',
-                warn: copyMove === true,
-                icon: 'content_copy'
-              },
-              {
-                label: 'Error Level Analysis (ELA)',
-                val: typeof elaScore === 'number' ? elaScore.toFixed(2) : '0.00',
-                hint: 'Double compression score',
-                warn: typeof elaScore === 'number' && elaScore > 0.5,
-                icon: 'broken_image'
-              },
-              {
-                label: 'Noise Inconsistency',
-                val: typeof noiseScore === 'number' ? noiseScore.toFixed(2) : '0.00',
-                hint: 'Substrate density match',
-                warn: typeof noiseScore === 'number' && noiseScore > 0.6,
-                icon: 'grain'
-              },
-              {
-                label: 'Font Consistency',
-                val: typeof fontScore === 'number' ? fontScore.toFixed(2) : '1.00',
-                hint: 'Typographical integrity',
-                warn: typeof fontScore === 'number' && fontScore < 0.7,
-                icon: 'font_download'
-              }
-            ].map(({ label, val, hint, warn, icon }) => (
-              <div key={label} className="bg-white/60 p-5 flex flex-col justify-between min-h-[110px] print:bg-white print:border-b print:border-outline-variant/20">
-                <div className="flex items-center gap-2">
-                  <span className={`material-symbols-outlined text-sm ${warn ? 'text-error' : 'text-on-surface-variant/50'}`}>{icon}</span>
-                  <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-wider">{label}</p>
-                </div>
-                <div className="mt-3">
-                  <p className={`text-xl font-bold leading-none tracking-tight ${warn ? 'text-error' : 'text-on-surface'}`}>
-                    {val}
-                  </p>
-                  <p className="text-[9px] text-on-surface-variant/40 font-semibold tracking-wide uppercase mt-1.5 leading-none">{hint}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
 
-      </div>
-    </PageShell>
+
+      {/* Dynamic Certificate Preview Modal */}
+      {showFilePreview && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="glass-card rounded-[32px] w-full max-w-4xl max-h-[85vh] flex flex-col border border-white/50 shadow-2xl relative overflow-hidden text-left bg-white/80">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-white/30 bg-white/40 flex items-center justify-between">
+              <div className="space-y-0.5">
+                <span className="text-[10px] uppercase font-bold text-primary tracking-widest">Document Vault Preview</span>
+                <h3 className="text-base font-bold text-on-surface truncate max-w-xl">{filename}</h3>
+              </div>
+              <button 
+                onClick={() => setShowFilePreview(false)}
+                className="w-8 h-8 rounded-full bg-white/60 border border-white/80 flex items-center justify-center hover:bg-error-container/20 hover:text-error transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1 flex flex-col items-center justify-center min-h-[350px] bg-slate-950/5">
+              {filename?.toLowerCase().endsWith('.pdf') ? (
+                <iframe 
+                  src={`/api/certificates/${id}/file?token=${localStorage.getItem('access_token')}`} 
+                  className="w-full h-[50vh] rounded-2xl border-0 shadow-inner bg-white" 
+                  title="PDF Certificate Preview"
+                />
+              ) : (
+                <div className="relative group max-w-full max-h-[50vh] rounded-2xl overflow-hidden shadow-md bg-white border border-white/40">
+                  <img 
+                    src={`/api/certificates/${id}/file?token=${localStorage.getItem('access_token')}`} 
+                    alt="Certificate Original Preview" 
+                    className="max-w-full max-h-[50vh] object-contain block"
+                    onError={(e) => {
+                      e.currentTarget.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23faf8ff'/%3E%3Ctext x='50' y='50' text-anchor='middle' font-size='6' fill='%237c5cbf'%3EPreview Load Error%3C/text%3E%3C/svg%3E`;
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-white/30 bg-white/40 flex items-center justify-between">
+              <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase">
+                Verdict: <span className="underline">{status}</span>
+              </span>
+              <div className="flex gap-2">
+                <a 
+                  href={`/api/certificates/${id}/file?token=${localStorage.getItem('access_token')}`} 
+                  download={filename}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-xl bg-white/60 border border-white text-on-surface font-bold text-xs shadow-sm hover:bg-primary-container/20 transition-all flex items-center gap-1.5 cursor-pointer decoration-none"
+                >
+                  <span className="material-symbols-outlined text-[16px]">download</span>
+                  Download Original
+                </a>
+                <button 
+                  onClick={() => setShowFilePreview(false)}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-tr from-primary to-primary-container text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer inner-glow"
+                >
+                  <span className="material-symbols-outlined text-[16px]">done</span>
+                  Close Preview
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  </PageShell>
   );
 }
 
@@ -342,4 +385,52 @@ function ErrorState({ message, onBack }) {
       </button>
     </div>
   );
+}
+
+function translateReason(reason) {
+  if (!reason) return "";
+  const r = reason.toLowerCase();
+  
+  // Active tampering/forgery signals
+  if (r.includes('ela') || r.includes('compression') || r.includes('double compression')) {
+    return "Error Level Analysis (ELA) indicates double-compression boundaries, suggesting sections of this document have been digitally spliced or edited.";
+  }
+  if (r.includes('noise inconsistency') || r.includes('substrate density') || r.includes('noise')) {
+    return "Pixel-level noise density mismatch detected. This indicates copy-pasted visual elements or overlaid text blocks that don't match the original page background.";
+  }
+  if (r.includes('copy-move') || r.includes('clone') || r.includes('forgery')) {
+    return "Cloned visual elements detected. Parts of this document (such as a signature, stamp, or logo) have been copied and cloned from elsewhere on the canvas.";
+  }
+  if (r.includes('font') || r.includes('typographical')) {
+    return "Typographical font family and size inconsistencies detected on the same line, indicating manual text overrides or modified letters.";
+  }
+  if (r.includes('editing software') || r.includes('software') || r.includes('metadata')) {
+    return "File metadata analysis detects that this certificate was exported or edited using consumer graphics software (such as Photoshop, Canva, or Acrobat Pro).";
+  }
+  if (r.includes('future date')) {
+    return `Logical anomaly: A signature or verification date on this document occurs in the future (${reason.split(':').pop().trim()}).`;
+  }
+  
+  // Content audit fields
+  if (r.includes('no dates')) {
+    return "Verification check failed to identify any official dates on the document canvas.";
+  }
+  if (r.includes('registration number')) {
+    return "No medical registration or licensing credentials identified (failed to verify official practitioner registry).";
+  }
+  if (r.includes('hospital or clinic') || r.includes('hospital name')) {
+    return "No official hospital, clinical facility, or institution name detected in the document text.";
+  }
+  if (r.includes('medical diagnosis') || r.includes('diagnosis keywords')) {
+    return "No standard medical diagnostics statements or medical keywords identified in the record context.";
+  }
+  if (r.includes('unusually short')) {
+    return "Document content density is unusually short (failed to extract a complete clinical record structure).";
+  }
+  if (r.includes('unusual characters') || r.includes('encoding')) {
+    return "High count of unusual character encodings detected, indicating potential file stream tampering or parsing corruption.";
+  }
+  
+  // Default fallback
+  return reason;
 }

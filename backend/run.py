@@ -22,5 +22,5 @@ if __name__ == "__main__":
         debug=app.config.get("DEBUG", False),
         host="0.0.0.0",
         port=int(os.environ.get("PORT", 5000)),
-        use_reloader=False,
+        use_reloader=True,
     )

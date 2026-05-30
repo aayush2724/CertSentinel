@@ -18,6 +18,8 @@ class User(db.Model):
     role = db.Column(db.Enum('admin', 'verifier', 'viewer', name='user_roles'), nullable=False, default='viewer')
     created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
     last_login = db.Column(db.DateTime(timezone=True), nullable=True)
+    name = db.Column(db.String(255), nullable=True)
+    avatar = db.Column(db.String(500), nullable=True)
 
     def __repr__(self):
         return f'<User {self.email}>'

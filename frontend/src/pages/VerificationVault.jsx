@@ -12,6 +12,7 @@ export default function VerificationVault() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [previewRecord, setPreviewRecord] = useState(null);
   const limit = 10;
 
   useEffect(() => {
@@ -101,7 +102,12 @@ export default function VerificationVault() {
   const formatDate = (dateStr) => {
     if (!dateStr) return { date: 'Recently', time: 'Just now' };
     try {
-      const d = new Date(dateStr);
+      // If the string lacks a timezone offset or Z suffix, append 'Z' to treat it as UTC
+      let parsedStr = dateStr;
+      if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.match(/-\d{2}:\d{2}$/)) {
+        parsedStr = dateStr + 'Z';
+      }
+      const d = new Date(parsedStr);
       return {
         date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         time: d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -253,13 +259,22 @@ export default function VerificationVault() {
                             </span>
                           </td>
                           <td className="px-4 py-2.5 text-right">
-                            <button 
-                              onClick={() => navigate(`/report/${log.id}`)}
-                              className="material-symbols-outlined p-1 text-on-surface-variant/40 hover:text-primary hover:bg-white/50 rounded-md transition-colors cursor-pointer text-[18px]"
-                              title="Open Forensic Report"
-                            >
-                              open_in_new
-                            </button>
+                            <div className="flex items-center justify-end gap-1">
+                              <button 
+                                onClick={() => setPreviewRecord(log)}
+                                className="material-symbols-outlined p-1 text-on-surface-variant/40 hover:text-primary hover:bg-white/50 rounded-md transition-colors cursor-pointer text-[18px]"
+                                title="Preview Certificate File"
+                              >
+                                visibility
+                              </button>
+                              <button 
+                                onClick={() => navigate(`/report/${log.id}`)}
+                                className="material-symbols-outlined p-1 text-on-surface-variant/40 hover:text-primary hover:bg-white/50 rounded-md transition-colors cursor-pointer text-[18px]"
+                                title="Open Forensic Report"
+                              >
+                                open_in_new
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -319,6 +334,75 @@ export default function VerificationVault() {
 
         </div>
       </main>
+
+      {/* Dynamic Certificate Preview Modal */}
+      {previewRecord && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="glass-card rounded-[32px] w-full max-w-4xl max-h-[85vh] flex flex-col border border-white/50 shadow-2xl relative overflow-hidden text-left bg-white/80">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-white/30 bg-white/40 flex items-center justify-between">
+              <div className="space-y-0.5">
+                <span className="text-[10px] uppercase font-bold text-primary tracking-widest">Document Vault Preview</span>
+                <h3 className="text-base font-bold text-on-surface truncate max-w-xl">{previewRecord.filename}</h3>
+              </div>
+              <button 
+                onClick={() => setPreviewRecord(null)}
+                className="w-8 h-8 rounded-full bg-white/60 border border-white/80 flex items-center justify-center hover:bg-error-container/20 hover:text-error transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1 flex flex-col items-center justify-center min-h-[350px] bg-slate-950/5">
+              {previewRecord.filename?.toLowerCase().endsWith('.pdf') ? (
+                <iframe 
+                  src={`/api/certificates/${previewRecord.id}/file?token=${localStorage.getItem('access_token')}`} 
+                  className="w-full h-[50vh] rounded-2xl border-0 shadow-inner bg-white" 
+                  title="PDF Certificate Preview"
+                />
+              ) : (
+                <div className="relative group max-w-full max-h-[50vh] rounded-2xl overflow-hidden shadow-md bg-white border border-white/40">
+                  <img 
+                    src={`/api/certificates/${previewRecord.id}/file?token=${localStorage.getItem('access_token')}`} 
+                    alt="Certificate Original Preview" 
+                    className="max-w-full max-h-[50vh] object-contain block"
+                    onError={(e) => {
+                      e.currentTarget.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23faf8ff'/%3E%3Ctext x='50' y='50' text-anchor='middle' font-size='6' fill='%237c5cbf'%3EPreview Load Error%3C/text%3E%3C/svg%3E`;
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-white/30 bg-white/40 flex items-center justify-between">
+              <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase">
+                Verdict: <span className="underline">{previewRecord.status}</span>
+              </span>
+              <div className="flex gap-2">
+                <a 
+                  href={`/api/certificates/${previewRecord.id}/file?token=${localStorage.getItem('access_token')}`} 
+                  download={previewRecord.filename}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-xl bg-white/60 border border-white text-on-surface font-bold text-xs shadow-sm hover:bg-primary-container/20 transition-all flex items-center gap-1.5 cursor-pointer decoration-none"
+                >
+                  <span className="material-symbols-outlined text-[16px]">download</span>
+                  Download Original
+                </a>
+                <button 
+                  onClick={() => { setPreviewRecord(null); navigate(`/report/${previewRecord.id}`); }}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-tr from-primary to-primary-container text-white font-bold text-xs shadow-md hover:shadow-lg transition-all flex items-center gap-1.5 cursor-pointer inner-glow"
+                >
+                  <span className="material-symbols-outlined text-[16px]">analytics</span>
+                  View Diagnostics
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,30 +6,34 @@ const DEFAULT_AVATAR_SVG = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2
 const ALL_NAV_ITEMS = [
   { path: '/', label: 'Launchpad', icon: 'home', roles: ['admin', 'verifier', 'viewer'] },
   { path: '/dashboard', label: 'Command Center', icon: 'dashboard', roles: ['admin'] },
-  { path: '/analysis', label: 'Analysis Engine', icon: 'query_stats', roles: ['verifier'] },
-  { path: '/forensic', label: 'Forensic Report', icon: 'description', roles: ['verifier'] },
+  { path: '/analysis', label: 'Analysis Engine', icon: 'query_stats', roles: ['admin', 'verifier'] },
   { path: '/vault', label: 'Verification Vault', icon: 'verified_user', roles: ['admin', 'verifier', 'viewer'] },
 ];
 
 export default function Sidebar({ user }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user: authUser } = useAuth();
+  const { user: authUser, logout } = useAuth();
 
   // Use session user or fallback to prop, then fallback to guest
   const rawUser = authUser || user || { name: 'Guest', role: 'viewer', avatar: null };
 
   // Map roles to correct system roles and profile information
   const getProfile = (u) => {
-    // normalize raw role
-    let normalizedRole = u.role ? u.role.toLowerCase() : 'viewer';
-    if (normalizedRole.includes('admin')) normalizedRole = 'admin';
-    else if (normalizedRole.includes('verify')) normalizedRole = 'verifier';
-    else normalizedRole = 'viewer';
+    // normalize raw role – use exact match for known roles
+    const raw = (u.role || '').toLowerCase().trim();
+    let normalizedRole;
+    if (raw === 'admin' || raw === 'lead administrator' || raw.includes('admin')) {
+      normalizedRole = 'admin';
+    } else if (raw === 'verifier' || raw.includes('verif')) {
+      normalizedRole = 'verifier';
+    } else {
+      normalizedRole = 'viewer';
+    }
 
     if (normalizedRole === 'admin') {
       return {
-        name: u.email === 'admin@certsentinel.dev' ? 'Dr. Julian Vance' : (u.name || 'System Admin'),
+        name: u.name || (u.email === 'admin@medverify.dev' ? 'Dr. Julian Vance' : (u.email || 'System Admin')),
         role: 'admin',
         roleLabel: 'System Admin',
         avatar: u.avatar || 'https://lh3.googleusercontent.com/aida-public/AB6AXuCx9pEksSfepdb9zDTtfwPbbT7c_OplpA2ekaqkQHhzXAYiHSjppHiqphVSN2h3kDrQRbdWjgCohEZLOYh7KHfDJgIs_XOD_GbShfSOpy9a3O4T5rwt1rXgMSGbGkTUC6-Tdhc7plITdtolD_Yxp8DM7h0oYmCDdAWC_jry_s-jGvd2_8GuTn1au8FYpO1Ozezn_w4M12-COZndGo5CMrso_T9VjXOFZO_oWe6ZdvqWLWjTFkJboEp_O_5Z7yAeoBiPoynKgaB1nASq'
@@ -37,14 +41,14 @@ export default function Sidebar({ user }) {
     }
     if (normalizedRole === 'verifier') {
       return {
-        name: u.email === 'verifier@certsentinel.dev' ? 'Dr. Sarah Jenkins' : (u.name || 'Hospital Verifier'),
+        name: u.name || (u.email === 'verifier@medverify.dev' ? 'Dr. Sarah Jenkins' : (u.email || 'Hospital Verifier')),
         role: 'verifier',
         roleLabel: 'Verifier',
         avatar: u.avatar || 'https://lh3.googleusercontent.com/aida-public/AB6AXuDCtxurpFAiHFIk1wgdu08am-9cLnd_aDJyIUeBWfxE1sKl6qtcwjwtJUhq-A5n01bMAvUGEidYo_kWmvvTl_v2zcxoDEw9r5Kb3pdm8Ux9jLMMpurbCe7dOPapTSTaEoPzcvX8FApJEe7ktfqsFY3HTSdMjyoHGaGDbe4WCbzN6Q1XHYl0JJajBbze4oIphQ57g5i8AyaGCI_wR37k3XjuHTmZyTNCqrOnJw8J3gOvkkO4rHGSriQeFjmbeGePvZrJAMay_xb9iQ-G'
       };
     }
     return {
-      name: u.name || 'Guest Auditor',
+      name: u.name || u.email || 'Guest Auditor',
       role: 'viewer',
       roleLabel: 'Viewer',
       avatar: u.avatar
@@ -94,24 +98,37 @@ export default function Sidebar({ user }) {
       </div>
 
       <div className="mt-auto pt-8 border-t border-white/30">
-        {currentUser.role === 'verifier' && (
-          <button onClick={() => navigate('/')} className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-primary-container text-white font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all inner-glow flex items-center justify-center gap-2">
+        {(currentUser.role === 'verifier' || currentUser.role === 'admin') && location.pathname !== '/analysis' && (
+          <button onClick={() => navigate('/analysis')} className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary to-primary-container text-white font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all inner-glow flex items-center justify-center gap-2">
             <span className="material-symbols-outlined">add</span>
             <span className="hidden lg:inline">New Verification</span>
           </button>
         )}
-        <div className="mt-6 flex items-center justify-center lg:justify-start gap-3 px-2">
-          <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm shrink-0">
-            <img
-              alt="User Avatar"
-              src={currentUser.avatar || DEFAULT_AVATAR_SVG}
-              onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR_SVG; }}
-            />
+        <div className="mt-6 flex items-center justify-center lg:justify-between gap-3 px-2">
+          <div 
+            onClick={() => navigate('/profile')}
+            className="flex items-center gap-3 cursor-pointer hover:opacity-80 active:scale-95 transition-all"
+            title="Edit Profile"
+          >
+            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-sm shrink-0">
+              <img
+                alt="User Avatar"
+                src={currentUser.avatar || DEFAULT_AVATAR_SVG}
+                onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR_SVG; }}
+              />
+            </div>
+            <div className="hidden lg:block text-left">
+              <p className="text-sm font-bold text-on-surface line-clamp-1 max-w-[110px]">{currentUser.name}</p>
+              <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase">{currentUser.roleLabel}</p>
+            </div>
           </div>
-          <div className="hidden lg:block text-left">
-            <p className="text-sm font-bold text-on-surface">{currentUser.name}</p>
-            <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase">{currentUser.roleLabel}</p>
-          </div>
+          <button
+            onClick={() => { logout(); }}
+            className="p-2 rounded-xl hover:bg-error-container/20 transition-colors group"
+            title="Logout"
+          >
+            <span className="material-symbols-outlined text-on-surface-variant/50 group-hover:text-error transition-colors">logout</span>
+          </button>
         </div>
       </div>
     </nav>

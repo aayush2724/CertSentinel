@@ -12,55 +12,91 @@ from typing import Dict, Any
 
 
 class ImageAnalyzer:
+    def _convert_pdf_to_temp_img(self, pdf_path: str) -> str:
+        """Convert first page of PDF to a temporary PNG for visual forensic checks."""
+        import pypdfium2 as pdfium
+        temp_img_path = pdf_path + ".temp.png"
+        with pdfium.PdfDocument(pdf_path) as doc:
+            page = doc[0]
+            bitmap = page.render(scale=300 / 72)  # 300 DPI for high fidelity
+            pil_image = bitmap.to_pil()
+            pil_image.save(temp_img_path)
+        return temp_img_path
+
     def analyze(self, filepath: str) -> Dict[str, Any]:
         """Run all image forensic checks. Returns features dict."""
         results = {}
         flags = []
-
+        
+        is_pdf = filepath.lower().endswith('.pdf')
+        analysis_path = filepath
+        temp_created = False
+        
         try:
-            ela_score, ela_regions = self._error_level_analysis(filepath)
-            results['ela_score'] = ela_score
-            results['ela_suspicious_regions'] = ela_regions
-            if ela_score > 0.15:
-                flags.append(f'ELA indicates possible editing (score: {ela_score:.2f})')
-        except Exception as e:
-            results['ela_error'] = str(e)
+            if is_pdf:
+                try:
+                    analysis_path = self._convert_pdf_to_temp_img(filepath)
+                    temp_created = True
+                except Exception as e:
+                    # Fallback to original filepath on failure
+                    pass
+            
+            # 1. Error Level Analysis
+            try:
+                ela_score, ela_regions = self._error_level_analysis(analysis_path)
+                results['ela_score'] = ela_score
+                results['ela_suspicious_regions'] = ela_regions
+                if ela_score > 0.15:
+                    flags.append(f'ELA indicates possible editing (score: {ela_score:.2f})')
+            except Exception as e:
+                results['ela_error'] = str(e)
 
-        try:
-            noise_score = self._noise_inconsistency(filepath)
-            results['noise_inconsistency_score'] = noise_score
-            if noise_score > 0.3:
-                flags.append(f'Noise inconsistency detected (score: {noise_score:.2f})')
-        except Exception as e:
-            results['noise_error'] = str(e)
+            # 2. Noise Inconsistency
+            try:
+                noise_score = self._noise_inconsistency(analysis_path)
+                results['noise_inconsistency_score'] = noise_score
+                if noise_score > 0.3:
+                    flags.append(f'Noise inconsistency detected (score: {noise_score:.2f})')
+            except Exception as e:
+                results['noise_error'] = str(e)
 
-        try:
-            copy_move = self._detect_copy_move(filepath)
-            results['copy_move_detected'] = copy_move
-            if copy_move:
-                flags.append('Possible copy-move forgery detected')
-        except Exception as e:
-            results['copy_move_error'] = str(e)
+            # 3. Copy-Move Forgery
+            try:
+                copy_move = self._detect_copy_move(analysis_path)
+                results['copy_move_detected'] = copy_move
+                if copy_move:
+                    flags.append('Possible copy-move forgery detected')
+            except Exception as e:
+                results['copy_move_error'] = str(e)
 
-        try:
-            font_score = self._font_consistency(filepath)
-            results['font_consistency_score'] = font_score
-            if font_score < 0.6:
-                flags.append(f'Font inconsistency detected (score: {font_score:.2f})')
-        except Exception as e:
-            results['font_error'] = str(e)
+            # 4. Font Consistency
+            try:
+                font_score = self._font_consistency(analysis_path)
+                results['font_consistency_score'] = font_score
+                if font_score < 0.6:
+                    flags.append(f'Font inconsistency detected (score: {font_score:.2f})')
+            except Exception as e:
+                results['font_error'] = str(e)
 
-        try:
-            meta_flags = self._check_metadata(filepath)
-            results['metadata_flags'] = meta_flags
-            flags.extend(meta_flags)
-        except Exception as e:
-            results['metadata_error'] = str(e)
+            # 5. Metadata Check (always check original file)
+            try:
+                meta_flags = self._check_metadata(filepath)
+                results['metadata_flags'] = meta_flags
+                flags.extend(meta_flags)
+            except Exception as e:
+                results['metadata_error'] = str(e)
 
-        image_score = self._compute_image_score(flags)
-        results['image_authenticity_score'] = image_score
-        results['flags'] = flags
-        return results
+            image_score = self._compute_image_score(flags)
+            results['image_authenticity_score'] = image_score
+            results['flags'] = flags
+            return results
+            
+        finally:
+            if temp_created and os.path.exists(analysis_path):
+                try:
+                    os.remove(analysis_path)
+                except Exception:
+                    pass
 
     def _error_level_analysis(self, filepath: str, quality: int = 90):
         """ELA: Re-saves image at known quality and computes difference."""

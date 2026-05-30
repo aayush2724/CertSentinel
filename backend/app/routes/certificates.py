@@ -30,6 +30,7 @@ def verify():
     ip_address = request.remote_addr
     
     temp_path = None
+    success = False
     try:
         temp_path = FileValidator.save_temp(file, current_app.config['UPLOAD_FOLDER'])
         service = get_verification_service()
@@ -39,6 +40,7 @@ def verify():
             user_id=user_id, 
             ip_address=ip_address
         )
+        success = True
         
         response = {
             "record_id": str(record.id),
@@ -58,7 +60,7 @@ def verify():
         
         return jsonify(response), 200
     finally:
-        if temp_path and os.path.exists(temp_path):
+        if not success and temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
 
 @bp.route('/verify-async', methods=['POST'])
@@ -123,7 +125,7 @@ def list_records():
         limit=limit,
         offset=(page-1)*limit
     )
-    return jsonify([{"id": str(r.id), "filename": r.original_filename, "status": r.status, "submitted_at": r.submitted_at.isoformat() if r.submitted_at else None} for r in records]), 200
+    return jsonify([{"id": str(r.id), "filename": r.original_filename, "status": r.status, "submitted_at": (r.submitted_at.isoformat() + 'Z') if r.submitted_at else None} for r in records]), 200
 
 @bp.route('/<record_id>', methods=['GET'])
 @jwt_required()
@@ -149,6 +151,84 @@ def get_record(record_id):
         "model_version": record.model_version,
         "filename": record.original_filename,
     }), 200
+
+@bp.route('/<record_id>/file', methods=['GET'])
+def get_certificate_file(record_id):
+    # Authenticate via header or query string token to support native browser tags
+    auth_header = request.headers.get("Authorization")
+    token = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+    else:
+        token = request.args.get("token")
+        
+    if not token:
+        from ..errors import AuthError, UNAUTHORIZED
+        raise AuthError(UNAUTHORIZED, "Missing authorization token")
+        
+    from flask_jwt_extended import decode_token
+    try:
+        decode_token(token)
+    except Exception as e:
+        from ..errors import AuthError, UNAUTHORIZED
+        raise AuthError(UNAUTHORIZED, f"Invalid or expired token: {str(e)}")
+        
+    service = get_verification_service()
+    record = service.get_record(record_id, user_id=None)
+    
+    upload_dir = current_app.config['UPLOAD_FOLDER']
+    file_path = os.path.join(upload_dir, record.filename)
+    
+    if not os.path.exists(file_path):
+        # Generate a premium dynamic placeholder card matching the requested format if file isn't on disk (seeded data)
+        ext = record.original_filename.rsplit('.', 1)[1].lower() if '.' in record.original_filename else ''
+        file_ext = 'pdf' if ext == 'pdf' else 'png'
+        
+        placeholder_path = os.path.join(upload_dir, f"placeholder_{record_id}.{file_ext}")
+        if not os.path.exists(placeholder_path):
+            from PIL import Image, ImageDraw, ImageFont
+            # Create a premium high-resolution certificate card
+            img = Image.new('RGB', (1000, 700), color='#ffffff')
+            d = ImageDraw.Draw(img)
+            
+            # Draw sophisticated background gradients or frames
+            d.rectangle([(20, 20), (980, 680)], outline='#7c5cbf', width=6)
+            d.rectangle([(35, 35), (965, 665)], outline='#e8e0f0', width=2)
+            
+            # Header
+            d.text((100, 80), "MEDVERIFY SECURE LEDGER", fill='#7c5cbf')
+            d.text((100, 110), "Digital Cryptographic Audit Evidence", fill='#938f99')
+            
+            # Body metadata
+            d.text((100, 220), "DOCUMENT INFORMATION", fill='#7c5cbf')
+            d.text((100, 260), f"File Name: {record.original_filename}", fill='#1c1b1f')
+            d.text((100, 300), f"Record Reference: {record.id}", fill='#1c1b1f')
+            d.text((100, 340), f"Audit Timestamp: {record.submitted_at.isoformat() if record.submitted_at else 'N/A'}", fill='#1c1b1f')
+            
+            # Verdict Badge
+            status_colors = {'GENUINE': '#15803d', 'SUSPICIOUS': '#b45309', 'FAKE': '#b91c1c'}
+            color = status_colors.get(record.status, '#7c5cbf')
+            d.rectangle([(100, 420), (450, 480)], fill=color)
+            d.text((120, 435), f"STATUS: {record.status}", fill='#ffffff')
+            
+            # Confidence Scoring match
+            conf = int((record.confidence or 0) * 100)
+            d.text((100, 520), f"Authenticity Index Match: {conf}% Confidence", fill='#1c1b1f')
+            d.text((100, 560), "Authorized by MedVerify Automated Classifier", fill='#938f99')
+            
+            if file_ext == 'pdf':
+                img.save(placeholder_path, "PDF")
+            else:
+                img.save(placeholder_path, "PNG")
+        file_path = placeholder_path
+
+    # Extract format
+    ext = record.original_filename.rsplit('.', 1)[1].lower() if '.' in record.original_filename else ''
+    ext_to_mime = {'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'pdf': 'application/pdf'}
+    mime_type = ext_to_mime.get(ext, 'application/octet-stream')
+    
+    return send_file(file_path, mimetype=mime_type)
+
 
 @bp.route('/stats', methods=['GET'])
 @jwt_required()
@@ -179,5 +259,5 @@ def export_record(record_id):
         "processing_time_ms": record.processing_time_ms,
         "model_version": record.model_version,
         "filename": record.original_filename,
-        "submitted_at": record.submitted_at.isoformat() if record.submitted_at else None,
+        "submitted_at": (record.submitted_at.isoformat() + 'Z') if record.submitted_at else None,
     }), 200
