@@ -79,7 +79,13 @@ def login():
         access_token = create_access_token(identity=str(user.id), additional_claims={"role": user.role})
         return jsonify({
             "access_token": access_token,
-            "user": {"id": str(user.id), "email": user.email, "role": user.role}
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "role": user.role,
+                "name": user.name,
+                "avatar": user.avatar
+            }
         }), 200
     
     if user:
@@ -103,8 +109,59 @@ def me():
         "id": str(user.id),
         "email": user.email,
         "role": user.role,
+        "name": user.name,
+        "avatar": user.avatar,
         "created_at": user.created_at.isoformat()
     }), 200
+
+@bp.route('/update-profile', methods=['PUT'])
+@jwt_required()
+def update_profile():
+    audit_repo = AuditRepository(db.session)
+    user_id = get_jwt_identity()
+    try:
+        user_uuid = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+    except (ValueError, AttributeError):
+        raise AuthError(UNAUTHORIZED, "Invalid user ID")
+        
+    user = db.session.get(User, user_uuid)
+    if not user:
+        raise AuthError(UNAUTHORIZED, "User not found")
+        
+    data = request.get_json(silent=True) or {}
+    name = data.get('name')
+    email = data.get('email')
+    avatar = data.get('avatar')
+    
+    if email:
+        # Check if email is already taken by another user
+        existing = User.query.filter_by(email=email).first()
+        if existing and existing.id != user.id:
+            return jsonify({"error_code": "VALIDATION_ERROR", "message": "Email is already taken"}), 400
+        user.email = email
+        
+    if name is not None:
+        user.name = name
+        
+    if avatar is not None:
+        user.avatar = avatar
+        
+    try:
+        db.session.commit()
+        audit_repo.log(user.id, 'UPDATE_PROFILE', ip_address=request.remote_addr)
+        return jsonify({
+            "message": "Profile updated successfully",
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "role": user.role,
+                "name": user.name,
+                "avatar": user.avatar
+            }
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Failed to update profile", "details": str(e)}), 500
 
 @bp.route('/logout', methods=['POST'])
 @jwt_required()

@@ -19,20 +19,29 @@ def _seed_default_users(app):
     """Create default admin and verifier users if they don't exist."""
     from .models import User
     try:
-        if not User.query.filter_by(email='admin@certsentinel.dev').first():
-            admin = User(
-                email='admin@certsentinel.dev',
+        # Seed medverify.dev users for consistent branding
+        if not User.query.filter_by(email='admin@medverify.dev').first():
+            admin_mv = User(
+                email='admin@medverify.dev',
                 password_hash=bcrypt.generate_password_hash('admin123').decode('utf-8'),
                 role='admin'
             )
-            db.session.add(admin)
-        if not User.query.filter_by(email='verifier@certsentinel.dev').first():
-            verifier = User(
-                email='verifier@certsentinel.dev',
+            db.session.add(admin_mv)
+        if not User.query.filter_by(email='verifier@medverify.dev').first():
+            verifier_mv = User(
+                email='verifier@medverify.dev',
                 password_hash=bcrypt.generate_password_hash('verifier123').decode('utf-8'),
                 role='verifier'
             )
-            db.session.add(verifier)
+            db.session.add(verifier_mv)
+        if not User.query.filter_by(email='viewer@medverify.dev').first():
+            viewer_mv = User(
+                email='viewer@medverify.dev',
+                password_hash=bcrypt.generate_password_hash('viewer123').decode('utf-8'),
+                role='viewer'
+            )
+            db.session.add(viewer_mv)
+            
         db.session.commit()
         app.logger.info('Default users verified/created.')
     except Exception as e:

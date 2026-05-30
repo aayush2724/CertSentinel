@@ -41,11 +41,15 @@ export default function Login() {
         className="w-full max-w-[420px] bg-surface border border-outline-variant/30 rounded-3xl p-10 shadow-xl relative z-10"
       >
         <div className="mb-10">
-          <div className="flex items-center gap-3 mb-6">
+          <div 
+            onClick={() => navigate('/')} 
+            className="inline-flex items-center gap-3 mb-6 cursor-pointer hover:opacity-80 active:scale-95 transition-all"
+            title="Go to Home"
+          >
             <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
               <span className="material-symbols-outlined text-on-primary text-[24px]" style={{fontVariationSettings: "'FILL' 1"}}>shield_with_heart</span>
             </div>
-            <span className="font-title-lg text-primary font-bold tracking-tight">CertSentinel</span>
+            <span className="font-title-lg text-primary font-bold tracking-tight">MedVerify</span>
           </div>
           
           <h1 className="font-display-sm text-text-primary mb-2">Welcome Back</h1>
@@ -65,7 +69,7 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full bg-surface-container-low border border-outline-variant/30 rounded-2xl pl-12 pr-4 py-3.5 font-body-md text-text-primary focus:ring-2 focus:ring-primary/20 focus:border-primary/30 outline-none transition-all"
-                placeholder="admin@certsentinel.dev"
+                placeholder="admin@medverify.dev"
               />
             </div>
           </div>
@@ -115,10 +119,24 @@ export default function Login() {
         </form>
 
         <div className="mt-10 pt-8 border-t border-outline-variant/20">
-          <p className="font-label-sm text-text-tertiary text-center leading-relaxed">
-            Secure forensic environment. Authorized access only.<br/>
-            <span className="text-primary/60 mt-1 block">Demo: admin@certsentinel.dev / admin123</span>
+          <p className="font-label-sm text-text-tertiary text-center leading-relaxed mb-4">
+            Secure forensic environment. Authorized access only.
           </p>
+          <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-4 space-y-2 text-left font-body-sm">
+            <p className="font-bold text-text-secondary text-[11px] uppercase tracking-wider mb-1">Available Demo Accounts</p>
+            <div className="flex justify-between text-xs text-text-tertiary">
+              <span>Admin:</span>
+              <span className="font-bold text-primary">admin@medverify.dev / admin123</span>
+            </div>
+            <div className="flex justify-between text-xs text-text-tertiary">
+              <span>Verifier:</span>
+              <span className="font-bold text-primary">verifier@medverify.dev / verifier123</span>
+            </div>
+            <div className="flex justify-between text-xs text-text-tertiary">
+              <span>Viewer:</span>
+              <span className="font-bold text-primary">viewer@medverify.dev / viewer123</span>
+            </div>
+          </div>
         </div>
       </motion.div>
     </div>

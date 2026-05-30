@@ -10,8 +10,8 @@ const Login = lazy(() => import('./pages/Login'));
 const History = lazy(() => import('./pages/History'));
 const CommandCenter = lazy(() => import('./pages/CommandCenter'));
 const AnalysisEngine = lazy(() => import('./pages/AnalysisEngine'));
-const ForensicReport = lazy(() => import('./pages/ForensicReport'));
 const VerificationVault = lazy(() => import('./pages/VerificationVault'));
+const Profile = lazy(() => import('./pages/Profile'));
 
 const pageVariants = {
   initial: { opacity: 0 },
@@ -25,13 +25,11 @@ function AnimatedRoutes() {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={
-          <ProtectedRoute>
-            <motion.div {...pageVariants}>
-              <Suspense fallback={<PageLoader />}>
-                <Home />
-              </Suspense>
-            </motion.div>
-          </ProtectedRoute>
+          <motion.div {...pageVariants}>
+            <Suspense fallback={<PageLoader />}>
+              <Home />
+            </Suspense>
+          </motion.div>
         } />
         <Route path="/login" element={
           <motion.div {...pageVariants}>
@@ -67,15 +65,6 @@ function AnimatedRoutes() {
             </motion.div>
           </ProtectedRoute>
         } />
-        <Route path="/forensic" element={
-          <ProtectedRoute requiredRole="verifier">
-            <motion.div {...pageVariants}>
-              <Suspense fallback={<PageLoader />}>
-                <ForensicReport />
-              </Suspense>
-            </motion.div>
-          </ProtectedRoute>
-        } />
         <Route path="/vault" element={
           <ProtectedRoute requiredRole="viewer">
             <motion.div {...pageVariants}>
@@ -90,6 +79,15 @@ function AnimatedRoutes() {
             <motion.div {...pageVariants}>
               <Suspense fallback={<PageLoader />}>
                 <History />
+              </Suspense>
+            </motion.div>
+          </ProtectedRoute>
+        } />
+        <Route path="/profile" element={
+          <ProtectedRoute requiredRole="viewer">
+            <motion.div {...pageVariants}>
+              <Suspense fallback={<PageLoader />}>
+                <Profile />
               </Suspense>
             </motion.div>
           </ProtectedRoute>

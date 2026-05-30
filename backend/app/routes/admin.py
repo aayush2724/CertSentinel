@@ -56,7 +56,7 @@ def records():
             "confidence_threshold_used": row.confidence_threshold_used,
             "model_version": row.model_version,
             "processing_time_ms": row.processing_time_ms,
-            "submitted_at": row.submitted_at.isoformat(),
+            "submitted_at": (row.submitted_at.isoformat() + 'Z') if row.submitted_at else None,
         }
         for row in rows
     ])

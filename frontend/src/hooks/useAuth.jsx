@@ -36,11 +36,18 @@ export function AuthProvider({ children }) {
     } finally {
       localStorage.removeItem('access_token');
       setUser(null);
+      window.location.href = '/login';
     }
   };
 
+  const updateProfile = async (data) => {
+    const res = await authAPI.updateProfile(data);
+    setUser(res.data.user);
+    return res.data;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateProfile, token: localStorage.getItem('access_token') }}>
       {children}
     </AuthContext.Provider>
   );

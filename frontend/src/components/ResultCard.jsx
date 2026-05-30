@@ -15,7 +15,7 @@ const ResultCard = ({ result, onReset }) => {
   const downloadReport = () => {
     const doc = new jsPDF();
     doc.setFontSize(22);
-    doc.text('CertSentinel Verification Report', 20, 20);
+    doc.text('MedVerify Verification Report', 20, 20);
     doc.setFontSize(12);
     doc.text(`Record ID: ${result.record_id}`, 20, 30);
     doc.text(`Status: ${result.status}`, 20, 40);
@@ -27,7 +27,7 @@ const ResultCard = ({ result, onReset }) => {
       doc.text(`- ${reason}`, 25, 90 + (i * 10));
     });
     
-    doc.save(`CertSentinel_Report_${result.record_id}.pdf`);
+    doc.save(`MedVerify_Report_${result.record_id}.pdf`);
   };
 
   return (

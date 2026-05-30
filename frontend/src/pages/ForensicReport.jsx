@@ -1,182 +1,293 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { certificateAPI } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 import Sidebar from '../components/Sidebar';
 
-export default function ForensicReport() {
-  const user = {
-    name: "Dr. Alexander Thorne",
-    role: "Senior Forensic Lead",
-    avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuCx9pEksSfepdb9zDTtfwPbbT7c_OplpA2ekaqkQHhzXAYiHSjppHiqphVSN2h3kDrQRbdWjgCohEZLOYh7KHfDJgIs_XOD_GbShfSOpy9a3O4T5rwt1rXgMSGbGkTUC6-Tdhc7plITdtolD_Yxp8DM7h0oYmCDdAWC_jry_s-jGvd2_8GuTn1au8FYpO1Ozezn_w4M12-COZndGo5CMrso_T9VjXOFZO_oWe6ZdvqWLWjTFkJboEp_O_5Z7yAeoBiPoynKgaB1nASq"
-  };
+const STATUS_THEMES = {
+  GENUINE:    { bg: 'bg-emerald-50/60', border: 'border-emerald-400/30', text: 'text-emerald-700', icon: 'check_circle', label: 'Genuine' },
+  SUSPICIOUS: { bg: 'bg-amber-50/60',   border: 'border-amber-400/30',   text: 'text-amber-700',   icon: 'warning',      label: 'Suspicious' },
+  FAKE:       { bg: 'bg-red-50/60',     border: 'border-red-400/30',     text: 'text-red-700',     icon: 'dangerous',    label: 'Likely Fake' },
+};
 
-  const analysisBreakdown = [
-    { label: 'Ink Composition', val: 98, status: 'Consistent', desc: 'Handwritten glyphs show uniform digital stroke pressure.', icon: 'colorize', color: 'primary' },
-    { label: 'Paper Integrity', val: 84, status: 'Template Detected', desc: 'Background pattern matches known digital prescription templates.', icon: 'texture', color: 'secondary' },
-    { label: 'Typography', val: 92, status: 'Stable', desc: 'Variable font weights are consistent with Dr. Akash Deep’s registry.', icon: 'font_download', color: 'tertiary' },
-  ];
+export default function ForensicReport() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [records, setRecords] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Load all verification records
+  useEffect(() => {
+    certificateAPI.getAll()
+      .then(res => {
+        const list = res.data?.records || res.data || [];
+        setRecords(list);
+        if (list.length > 0) setSelected(list[0]);
+      })
+      .catch(() => setError('Could not load verification records.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const theme = selected ? (STATUS_THEMES[selected.status] || STATUS_THEMES.SUSPICIOUS) : STATUS_THEMES.SUSPICIOUS;
+  const confidence = selected ? Math.round((selected.confidence_score || 0) * 100) : 0;
+
+  // Forensic metrics from image_forensics
+  const forensics = selected?.image_forensics || {};
+  const ml = forensics?.ml_features || {};
+  const elaScore   = ml.ela_score ?? forensics.ela_score ?? null;
+  const fontScore  = ml.font_consistency_score ?? forensics.font_consistency_score ?? null;
+  const copyMove   = ml.copy_move_detected ?? forensics.copy_move_detected ?? null;
+  const noiseScore = ml.noise_inconsistency_score ?? forensics.noise_inconsistency_score ?? null;
+  const info       = selected?.extracted_info || {};
+
+  const handleExportPDF = () => window.print();
+  const handleSeal = () => {
+    if (selected) navigate(`/report/${selected.id}`);
+  };
 
   return (
     <div className="text-on-surface font-body-md overflow-x-hidden min-h-screen relative bg-background">
-      {/* Organic Background Decorative Blobs */}
-      <div className="fixed top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary-container/20 rounded-full blur-[120px] pointer-events-none -z-10"></div>
-      <div className="fixed bottom-[-5%] left-[-5%] w-[400px] h-[400px] bg-secondary-container/20 rounded-full blur-[100px] pointer-events-none -z-10"></div>
+      {/* Background */}
+      <div className="fixed top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary-container/20 rounded-full blur-[120px] pointer-events-none -z-10" />
+      <div className="fixed bottom-[-5%] left-[-5%] w-[400px] h-[400px] bg-secondary-container/20 rounded-full blur-[100px] pointer-events-none -z-10" />
 
       <Sidebar user={user} />
 
-      {/* Main Canvas */}
       <main className="ml-20 lg:ml-72 p-4 lg:p-gutter min-h-screen transition-all duration-300">
-        {/* TopAppBar */}
-        <header className="fixed top-0 right-0 left-20 lg:left-72 h-20 z-40 bg-white/40 backdrop-blur-xl border-b border-white/20 shadow-sm flex items-center justify-between px-4 lg:px-gutter transition-all duration-300">
-          <div className="flex items-center gap-6 flex-1">
-            <h2 className="hidden md:block font-headline-md text-headline-md text-primary font-bold">Forensic Node v2.1</h2>
-            <div className="relative w-96 max-w-full">
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40">search</span>
-              <input 
-                className="w-full bg-white/20 border-white/40 focus:ring-primary/20 focus:border-primary/40 rounded-full pl-12 pr-4 py-2 text-body-md transition-all outline-none" 
-                placeholder="Search forensic records..." 
-                type="text"
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-surface-container-low/50 rounded-full transition-colors">
-              <span className="material-symbols-outlined text-on-surface-variant">notifications</span>
-            </button>
-            <button className="p-2 hover:bg-surface-container-low/50 rounded-full transition-colors">
-              <span className="material-symbols-outlined text-on-surface-variant">settings</span>
-            </button>
-            <div className="h-10 w-10 rounded-full overflow-hidden border-2 border-white shadow-sm ml-2">
-              <img alt="User Avatar" className="w-full h-full object-cover" src={user.avatar} />
-            </div>
+        {/* Header */}
+        <header className="flex items-center justify-between h-20 mb-6 print:hidden">
+          <div />
+          <div className="flex items-center gap-2">
+            <span className="font-label-sm text-on-surface">MedVerify Suite</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-bold uppercase">Pro</span>
           </div>
         </header>
 
-        {/* Page Content */}
-        <div className="pt-24 max-w-[1280px] mx-auto space-y-gutter">
-          {/* Header Section */}
-          <div className="flex items-end justify-between mb-10">
-            <div className="text-left">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="px-3 py-1 bg-secondary-container/50 backdrop-blur-md border border-white/40 rounded-full text-secondary text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></div>
-                  Active Diagnostic
-                </span>
-                <span className="text-on-surface-variant/50 text-label-sm font-bold uppercase">Report #MV-90284-F</span>
-              </div>
-              <h2 className="font-display-lg text-display-lg text-primary leading-tight">Forensic Analysis Report</h2>
-              <p className="font-body-lg text-on-surface-variant/70 max-w-2xl mt-2">Detailed multi-layer validation of substrate integrity and typographic alignment for specimen **AK_2026_PRESC**.</p>
-            </div>
-            <div className="flex gap-3">
-              <button className="px-6 py-3 rounded-full bg-white/40 border border-white/40 font-bold text-label-sm hover:bg-white transition-all flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px]">download</span>
-                Export PDF
-              </button>
-              <button className="px-6 py-3 rounded-full bg-primary text-white font-bold text-label-sm shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2">
-                <span className="material-symbols-outlined text-[18px]">verified</span>
-                Seal Verification
-              </button>
-            </div>
+        <div className="max-w-6xl mx-auto space-y-6">
+          {/* Page title */}
+          <div className="text-left mb-4">
+            <h2 className="font-display-lg text-display-lg text-primary tracking-tight">Forensic Report</h2>
+            <p className="font-body-lg text-on-surface-variant/70">Detailed forensic analysis of verified certificates.</p>
           </div>
 
-          <div className="grid grid-cols-12 gap-card-gap">
-            {/* Spatial Scan Preview */}
-            <div className="col-span-12 lg:col-span-8 glass-card rounded-[40px] p-10 inner-glow relative overflow-hidden flex flex-col items-center">
-              <div className="absolute top-6 left-10 flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-secondary animate-pulse"></div>
-                <span className="text-label-sm font-bold text-secondary uppercase tracking-widest">Spatial Scanning Active</span>
-              </div>
-              
-              {/* Document Mockup with Animation */}
-              <div className="relative mt-8 w-[340px] h-[460px] bg-white shadow-2xl rounded-sm border border-black/5 p-10 flex flex-col overflow-hidden group">
-                {/* Header Mock */}
-                <div className="border-b-2 border-primary/20 pb-4 mb-6">
-                  <div className="h-5 w-40 bg-primary/20 rounded-full mb-3"></div>
-                  <div className="h-3 w-56 bg-on-surface-variant/10 rounded-full"></div>
-                </div>
-                {/* Body Mock */}
-                <div className="space-y-5">
-                  <div className="h-3 w-full bg-on-surface-variant/5 rounded-full"></div>
-                  <div className="h-3 w-4/5 bg-on-surface-variant/5 rounded-full"></div>
-                  <div className="h-3 w-full bg-on-surface-variant/5 rounded-full"></div>
-                  {/* Watermark Overlay */}
-                  <div className="my-10 w-full h-16 border-4 border-dashed border-primary/10 rounded-2xl flex items-center justify-center -rotate-12">
-                    <span className="text-[12px] text-primary/20 font-black uppercase tracking-[0.4em]">TEMPLATE</span>
-                  </div>
-                  <div className="h-3 w-3/4 bg-on-surface-variant/5 rounded-full"></div>
-                </div>
-                {/* Scanning Line */}
-                <div className="animate-scan absolute left-0 w-full h-[3px] bg-primary shadow-[0_0_20px_rgba(103,85,140,1)] z-10"></div>
-                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
-              </div>
-
-              <div className="mt-10 grid grid-cols-3 gap-12 w-full border-t border-white/20 pt-10 text-left">
-                <div className="hover:translate-y-[-2px] transition-transform">
-                  <p className="text-[10px] text-on-surface-variant/60 uppercase font-bold tracking-widest mb-1">Subject / Patient</p>
-                  <p className="font-bold text-on-surface text-lg">Aayush Kumar</p>
-                </div>
-                <div className="hover:translate-y-[-2px] transition-transform">
-                  <p className="text-[10px] text-on-surface-variant/60 uppercase font-bold tracking-widest mb-1">Medical Lead</p>
-                  <p className="font-bold text-on-surface text-lg">Dr. Akash Deep</p>
-                </div>
-                <div className="hover:translate-y-[-2px] transition-transform">
-                  <p className="text-[10px] text-on-surface-variant/60 uppercase font-bold tracking-widest mb-1">Issuance Date</p>
-                  <p className="font-bold text-on-surface text-lg">12 May 2026</p>
-                </div>
-              </div>
+          {/* Loading state */}
+          {loading && (
+            <div className="flex items-center justify-center py-20">
+              <div className="w-8 h-8 rounded-full border-3 border-primary-container border-t-primary animate-spin" />
             </div>
+          )}
 
-            {/* Tamper Probability */}
-            <div className="col-span-12 lg:col-span-4 glass-card rounded-[40px] p-10 inner-glow flex flex-col justify-center items-center text-center relative overflow-hidden">
-              <div className="absolute -top-10 -right-10 w-40 h-40 bg-secondary-container/20 rounded-full blur-3xl"></div>
-              <h3 className="font-headline-md text-headline-md text-primary mb-10 z-10">Neural Risk Score</h3>
-              <div className="relative w-56 h-56 mb-10 z-10">
-                <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                  <circle className="text-surface-container-highest" cx="50" cy="50" fill="transparent" r="42" stroke="currentColor" strokeWidth="8"></circle>
-                  <circle 
-                    className="text-primary transition-all duration-1000 ease-out" 
-                    cx="50" cy="50" fill="transparent" r="42" 
-                    stroke="currentColor" strokeDasharray="263.9" strokeDashoffset={263.9 * (1 - 0.12)} 
-                    strokeLinecap="round" strokeWidth="10" 
-                  ></circle>
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-5xl font-extrabold text-primary">12%</span>
-                  <span className="text-label-sm text-on-surface-variant/60 uppercase font-bold tracking-widest mt-1">Suspicion Index</span>
-                </div>
-              </div>
-              <div className="w-full p-6 bg-primary-container/10 rounded-3xl border border-primary/10 z-10">
-                <p className="text-body-md text-primary font-medium">Anomaly detected in substrate background. 'TEMPLATE' watermark identifier suggests a non-unique digital issuance.</p>
-              </div>
+          {/* Error state */}
+          {error && (
+            <div className="glass-card rounded-3xl p-10 text-center">
+              <span className="material-symbols-outlined text-4xl text-error mb-3">error</span>
+              <p className="text-on-surface-variant">{error}</p>
+              <button onClick={() => navigate('/')} className="mt-4 px-6 py-2 rounded-full bg-primary text-white font-bold text-sm">
+                Go Home
+              </button>
             </div>
+          )}
 
-            {/* Structural Breakdown Bento Cards */}
-            {analysisBreakdown.map((item, i) => (
-              <div key={i} className="col-span-12 md:col-span-4 glass-card rounded-[32px] p-8 inner-glow hover:translate-y-[-6px] transition-all duration-300 group text-left">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className={`p-4 rounded-2xl bg-${item.color}-container/20 text-${item.color} group-hover:scale-110 transition-transform`}>
-                    <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>{item.icon}</span>
-                  </div>
-                  <h4 className="font-headline-md text-[22px] text-on-surface font-bold">{item.label}</h4>
+          {/* Empty state */}
+          {!loading && !error && records.length === 0 && (
+            <div className="glass-card rounded-3xl p-12 text-center">
+              <span className="material-symbols-outlined text-5xl text-on-surface-variant/30 mb-4">folder_off</span>
+              <h3 className="text-lg font-bold text-on-surface mb-2">No Records Found</h3>
+              <p className="text-on-surface-variant/60 mb-6">Verify a certificate first to see its forensic report here.</p>
+              <button onClick={() => navigate('/analysis')} className="px-6 py-3 rounded-full bg-primary text-white font-bold shadow-lg hover:scale-105 active:scale-95 transition-all">
+                Go to Analysis Engine
+              </button>
+            </div>
+          )}
+
+          {/* Main content when we have records */}
+          {!loading && !error && selected && (
+            <>
+              {/* Record selector (if more than one) */}
+              {records.length > 1 && (
+                <div className="print:hidden flex items-center gap-3 flex-wrap">
+                  <span className="text-label-sm text-on-surface-variant/60 font-bold uppercase tracking-wider">Select Record:</span>
+                  {records.slice(0, 10).map(r => (
+                    <button
+                      key={r.id}
+                      onClick={() => setSelected(r)}
+                      className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                        selected.id === r.id
+                          ? 'bg-primary text-white shadow-md'
+                          : 'bg-white/40 border border-white/40 text-on-surface-variant hover:bg-white/60'
+                      }`}
+                    >
+                      {r.filename?.substring(0, 20) || `Record ${r.id?.substring(0, 8)}`}
+                    </button>
+                  ))}
                 </div>
-                <div className="space-y-5">
-                  <div className="flex justify-between items-center text-label-sm">
-                    <span className="text-on-surface-variant/70 font-bold uppercase tracking-wider">{item.status}</span>
-                    <span className={`text-${item.color} font-bold text-lg`}>{item.val}%</span>
+              )}
+
+              {/* Action buttons */}
+              <div className="flex items-center justify-end gap-3 print:hidden">
+                <button
+                  onClick={handleExportPDF}
+                  className="px-5 py-2.5 rounded-full bg-white/50 border border-white/50 font-bold text-label-sm hover:bg-white transition-all flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[18px]">download</span>
+                  Export PDF
+                </button>
+                <button
+                  onClick={handleSeal}
+                  className="px-5 py-2.5 rounded-full bg-primary text-white font-bold text-label-sm shadow-lg hover:shadow-primary/20 transition-all flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[18px]">verified</span>
+                  View Full Report
+                </button>
+              </div>
+
+              {/* Verdict banner */}
+              <div className={`glass-card rounded-3xl p-6 lg:p-8 ${theme.border} border overflow-hidden relative text-left print:shadow-none`}>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${theme.bg} ${theme.text}`}>
+                        <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>{theme.icon}</span>
+                        {theme.label}
+                      </span>
+                    </div>
+                    <h3 className="text-xl lg:text-2xl font-extrabold text-on-surface tracking-tight">
+                      {selected.filename || 'Untitled Document'}
+                    </h3>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="px-2.5 py-1 rounded-lg bg-white/40 border border-white/50 text-[10px] font-bold text-on-surface-variant/70">
+                        ID: <code className="font-mono">{selected.id?.substring(0, 8)}...</code>
+                      </span>
+                      {selected.processing_time_ms && (
+                        <span className="px-2.5 py-1 rounded-lg bg-white/40 border border-white/50 text-[10px] font-bold text-on-surface-variant/70">
+                          Duration: {selected.processing_time_ms} ms
+                        </span>
+                      )}
+                      {selected.created_at && (
+                        <span className="px-2.5 py-1 rounded-lg bg-white/40 border border-white/50 text-[10px] font-bold text-on-surface-variant/70">
+                          {new Date(selected.created_at).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="w-full h-2.5 bg-surface-container-highest rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full bg-${item.color} rounded-full transition-all duration-1000 ease-out`} 
-                      style={{ width: `${item.val}%` }}
-                    ></div>
+
+                  {/* Confidence circle */}
+                  <div className="flex items-center gap-3 bg-white/40 border border-white/60 rounded-2xl px-4 py-3 shadow-sm shrink-0">
+                    <div className="relative w-14 h-14">
+                      <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                        <circle className="text-outline-variant/30" cx="18" cy="18" r="16" fill="none" stroke="currentColor" strokeWidth="3" />
+                        <circle
+                          className="text-primary transition-all duration-1000"
+                          cx="18" cy="18" r="16" fill="none"
+                          stroke="currentColor" strokeDasharray="100" strokeDashoffset={100 - confidence}
+                          strokeLinecap="round" strokeWidth="3.5"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-sm font-extrabold text-primary">{confidence}%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[9px] uppercase tracking-widest text-on-surface-variant/60 font-bold">Confidence</p>
+                      <p className="text-xs font-bold text-on-surface mt-0.5">Score</p>
+                    </div>
                   </div>
-                  <p className="text-body-md text-on-surface-variant/80 leading-relaxed">{item.desc}</p>
                 </div>
               </div>
-            ))}
-          </div>
+
+              {/* Two-column: Extracted Info + Verification Signals */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 print:gap-4">
+                {/* Extracted Info */}
+                <div className="glass-card inner-glow rounded-3xl overflow-hidden border-white/50 text-left print:shadow-none">
+                  <div className="px-5 py-3.5 border-b border-white/20 bg-white/20 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[18px]">person_search</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface">Extracted Information</h3>
+                  </div>
+                  <div className="divide-y divide-white/20">
+                    {[
+                      { label: 'Physician Name', val: info.doctor_name, icon: 'badge' },
+                      { label: 'Hospital / Facility', val: info.hospital_name, icon: 'local_hospital' },
+                      { label: 'Date(s)', val: info.dates?.join(', '), icon: 'calendar_month' },
+                      { label: 'Registration No.', val: info.registration_numbers?.join(', '), icon: 'pin' },
+                    ].map(({ label, val, icon }) => (
+                      <div key={label} className="p-4 flex items-start gap-3 hover:bg-white/10 transition-colors">
+                        <div className="w-7 h-7 rounded-lg bg-white/50 border border-white/60 flex items-center justify-center shrink-0 mt-0.5">
+                          <span className="material-symbols-outlined text-primary text-[16px]">{icon}</span>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-on-surface-variant/50 font-bold uppercase tracking-wider">{label}</p>
+                          <p className={`text-xs font-semibold ${val ? 'text-on-surface' : 'text-on-surface-variant/50 italic'}`}>
+                            {val || 'Not detected'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Verification Signals */}
+                <div className="glass-card inner-glow rounded-3xl overflow-hidden border-white/50 text-left print:shadow-none">
+                  <div className="px-5 py-3.5 border-b border-white/20 bg-white/20 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-[18px]">gpp_maybe</span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface">Verification Signals</h3>
+                  </div>
+                  <div className="divide-y divide-white/20">
+                    {(selected.reasons || []).length > 0 ? (
+                      selected.reasons.map((reason, i) => (
+                        <div key={i} className="flex items-start gap-3 p-4 hover:bg-white/10 transition-colors">
+                          <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                            <span className="material-symbols-outlined text-amber-600 text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>warning</span>
+                          </div>
+                          <p className="text-xs text-on-surface-variant/80 font-medium leading-relaxed mt-0.5">{reason}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-8 flex flex-col items-center justify-center text-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-emerald-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-on-surface">No Anomalies Found</p>
+                          <p className="text-[10px] text-on-surface-variant/60 mt-0.5">All checks passed successfully.</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Forensic Diagnostics */}
+              <div className="glass-card inner-glow rounded-3xl overflow-hidden border-white/50 text-left print:shadow-none">
+                <div className="px-5 py-3.5 border-b border-white/20 bg-white/20 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[18px]">biotech</span>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface">Digital Forensic Diagnostics</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-px bg-outline-variant/10">
+                  {[
+                    { label: 'Copy-Move', val: copyMove === true ? 'Detected' : (copyMove === false ? 'None' : '—'), warn: copyMove === true, icon: 'content_copy' },
+                    { label: 'ELA Score', val: typeof elaScore === 'number' ? elaScore.toFixed(2) : '—', warn: typeof elaScore === 'number' && elaScore > 0.5, icon: 'broken_image' },
+                    { label: 'Noise Inconsistency', val: typeof noiseScore === 'number' ? noiseScore.toFixed(2) : '—', warn: typeof noiseScore === 'number' && noiseScore > 0.6, icon: 'grain' },
+                    { label: 'Font Consistency', val: typeof fontScore === 'number' ? fontScore.toFixed(2) : '—', warn: typeof fontScore === 'number' && fontScore < 0.7, icon: 'font_download' },
+                  ].map(({ label, val, warn, icon }) => (
+                    <div key={label} className="bg-white/60 p-5 flex flex-col justify-between min-h-[100px]">
+                      <div className="flex items-center gap-2">
+                        <span className={`material-symbols-outlined text-sm ${warn ? 'text-error' : 'text-on-surface-variant/50'}`}>{icon}</span>
+                        <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-wider">{label}</p>
+                      </div>
+                      <p className={`text-xl font-bold mt-3 ${warn ? 'text-error' : 'text-on-surface'}`}>{val}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
-        <div className="pb-20"></div>
+
+        <div className="pb-16" />
       </main>
     </div>
   );
 }
-
-

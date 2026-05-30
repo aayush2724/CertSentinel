@@ -49,6 +49,7 @@ export const authAPI = {
   register: (data) => api.post('/api/auth/register', data),
   me: () => api.get('/api/auth/me'),
   logout: () => api.post('/api/auth/logout'),
+  updateProfile: (data) => api.put('/api/auth/update-profile', data),
 };
 
 export const adminAPI = {

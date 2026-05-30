@@ -53,14 +53,29 @@ class CertificateClassifier:
         else:
             confidence = self._fallback_score(features)
 
-        if confidence >= self.thresholds["genuine"]:
-            status = "GENUINE"
-        elif confidence >= self.thresholds["suspicious"]:
+        reasons = features.get("flags", [])
+        has_critical_visual_edit = any(
+            ('ELA' in r) or ('Noise' in r) or ('copy-move' in r) or ('software' in r)
+            for r in reasons
+        )
+        has_future_date = any('Future date' in r for r in reasons)
+        
+        if has_critical_visual_edit:
+            # Force FAKE if there's clear visual manipulation
+            confidence = min(confidence, 0.3)
+            status = "FAKE"
+        elif has_future_date:
+            # Force SUSPICIOUS if it has a future date
+            confidence = min(confidence, 0.44)
             status = "SUSPICIOUS"
         else:
-            status = "FAKE"
+            if confidence >= self.thresholds["genuine"]:
+                status = "GENUINE"
+            elif confidence >= self.thresholds["suspicious"]:
+                status = "SUSPICIOUS"
+            else:
+                status = "FAKE"
 
-        reasons = features.get("flags", [])
         if not reasons:
             reasons = ["No significant issues detected"]
 
