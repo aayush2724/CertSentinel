@@ -14,14 +14,14 @@ class BaseConfig:
 
     # Database — PostgreSQL
     SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL", f"sqlite:///{os.path.join(BASE_DIR, 'certsentinel_dev.db')}"
+        "DATABASE_URL", f"sqlite:///{os.path.join(BASE_DIR, 'medverify_dev.db')}"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {}
 
     # File uploads
     UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-    MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10 MB
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
     ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "pdf"}
     ALLOWED_MIME_TYPES = {"image/png", "image/jpeg", "application/pdf"}
 
@@ -32,8 +32,11 @@ class BaseConfig:
     CONFIDENCE_THRESHOLD_SUSPICIOUS = 0.45
 
     # Celery / Redis (async jobs)
-    CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-    CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", REDIS_URL)
+    CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", REDIS_URL)
+    JWT_BLOCKLIST_REDIS_URL = os.environ.get("JWT_BLOCKLIST_REDIS_URL", REDIS_URL)
+    JWT_BLOCKLIST_REQUIRED = os.environ.get("JWT_BLOCKLIST_REQUIRED", "").lower() in {"1", "true", "yes"}
 
     # Rate limiting
     RATELIMIT_DEFAULT = "100 per hour"
@@ -55,6 +58,7 @@ class DevelopmentConfig(BaseConfig):
 
 class ProductionConfig(BaseConfig):
     DEBUG = False
+    JWT_BLOCKLIST_REQUIRED = os.environ.get("JWT_BLOCKLIST_REQUIRED", "true").lower() in {"1", "true", "yes"}
 
 class TestingConfig(BaseConfig):
     TESTING = True

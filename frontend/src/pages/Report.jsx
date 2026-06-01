@@ -57,17 +57,11 @@ export default function Report() {
   if (error) return <PageShell><ErrorState message={error} onBack={() => navigate('/vault')} /></PageShell>;
   if (!record) return <PageShell><ErrorState message="Certificate record could not be loaded." onBack={() => navigate('/vault')} /></PageShell>;
 
-  const { status, confidence_score, reasons, extracted_info, image_forensics, processing_time_ms } = record;
+  const { status, confidence_score, reasons, extracted_info, processing_time_ms } = record;
   
   const theme = STATUS_THEMES[status] || STATUS_THEMES.SUSPICIOUS;
   const confidencePercent = Math.round((confidence_score || 0) * 100);
   const filename = record.filename || 'unknown_document.pdf';
-
-  // Read ELA and Font scores correcting for the nested ml_features bug
-  const elaScore = image_forensics?.ml_features?.ela_score ?? image_forensics?.ela_score;
-  const fontScore = image_forensics?.ml_features?.font_consistency_score ?? image_forensics?.font_consistency_score;
-  const copyMove = image_forensics?.ml_features?.copy_move_detected ?? image_forensics?.copy_move_detected;
-  const noiseScore = image_forensics?.ml_features?.noise_inconsistency_score ?? image_forensics?.noise_inconsistency_score;
 
   return (
     <PageShell>

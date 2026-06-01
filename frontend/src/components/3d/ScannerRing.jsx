@@ -1,6 +1,5 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { MathUtils } from 'three';
 import { useSpring, animated } from '@react-spring/three';
 
 export default function ScannerRing() {

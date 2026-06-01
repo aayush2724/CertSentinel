@@ -40,6 +40,10 @@ class VerificationRepository:
         query = self.session.query(VerificationRecord)
         
         if user_id:
+            try:
+                user_id = uuid.UUID(str(user_id))
+            except (ValueError, TypeError, AttributeError):
+                return []
             query = query.filter_by(user_id=user_id)
         if status_filter:
             query = query.filter_by(status=status_filter)
@@ -48,20 +52,36 @@ class VerificationRepository:
         if date_to:
             query = query.filter(VerificationRecord.submitted_at <= date_to)
             
+        limit = max(1, min(int(limit or 100), 500))
+        offset = max(0, int(offset or 0))
         return query.order_by(VerificationRecord.submitted_at.desc()).limit(limit).offset(offset).all()
 
-    def get_stats(self) -> dict:
+    def get_stats(self, user_id=None) -> dict:
         today = datetime.utcnow().date()
+        base_query = self.session.query(VerificationRecord)
+        if user_id:
+            try:
+                user_id = uuid.UUID(str(user_id))
+            except (ValueError, TypeError, AttributeError):
+                return {
+                    "total": 0,
+                    "genuine_count": 0,
+                    "suspicious_count": 0,
+                    "fake_count": 0,
+                    "avg_confidence": 0,
+                    "records_today": 0,
+                }
+            base_query = base_query.filter_by(user_id=user_id)
         
-        total = self.session.query(func.count(VerificationRecord.id)).scalar()
-        genuine = self.session.query(func.count(VerificationRecord.id)).filter_by(status='GENUINE').scalar()
-        suspicious = self.session.query(func.count(VerificationRecord.id)).filter_by(status='SUSPICIOUS').scalar()
-        fake = self.session.query(func.count(VerificationRecord.id)).filter_by(status='FAKE').scalar()
+        total = base_query.with_entities(func.count(VerificationRecord.id)).scalar()
+        genuine = base_query.filter_by(status='GENUINE').with_entities(func.count(VerificationRecord.id)).scalar()
+        suspicious = base_query.filter_by(status='SUSPICIOUS').with_entities(func.count(VerificationRecord.id)).scalar()
+        fake = base_query.filter_by(status='FAKE').with_entities(func.count(VerificationRecord.id)).scalar()
         
-        avg_confidence = self.session.query(func.avg(VerificationRecord.confidence)).scalar() or 0
-        records_today = self.session.query(func.count(VerificationRecord.id)).filter(
+        avg_confidence = base_query.with_entities(func.avg(VerificationRecord.confidence)).scalar() or 0
+        records_today = base_query.filter(
             func.cast(VerificationRecord.submitted_at, db.Date) == today
-        ).scalar()
+        ).with_entities(func.count(VerificationRecord.id)).scalar()
         
         return {
             "total": total,

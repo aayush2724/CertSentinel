@@ -117,7 +117,10 @@ def update_thresholds():
 
     updated = runtime_settings.set_thresholds(genuine, suspicious)
 
-    from ml.classifier import CertificateClassifier
+    try:
+        from ...ml.classifier import CertificateClassifier
+    except ImportError:
+        from ml.classifier import CertificateClassifier
     if CertificateClassifier._instance is not None:
         CertificateClassifier._instance.thresholds = updated
 

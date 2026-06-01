@@ -9,6 +9,12 @@ from ..errors import FileValidationError, RECORD_NOT_FOUND, UNAUTHORIZED
 
 bp = Blueprint('certificates', __name__)
 
+def _is_admin():
+    return get_jwt().get('role') == 'admin'
+
+def _record_scope_user_id():
+    return None if _is_admin() else get_jwt_identity()
+
 def get_verification_service():
     return VerificationService(
         db.session, 
@@ -117,11 +123,11 @@ def get_task_status(task_id):
 @bp.route('', methods=['GET'])
 @jwt_required()
 def list_records():
-    page = request.args.get('page', 1, type=int)
-    limit = request.args.get('limit', 20, type=int)
+    page = max(1, request.args.get('page', 1, type=int))
+    limit = min(max(1, request.args.get('limit', 20, type=int)), 100)
     service = get_verification_service()
     records = service.list_records(
-        user_id=None,
+        user_id=_record_scope_user_id(),
         limit=limit,
         offset=(page-1)*limit
     )
@@ -130,12 +136,8 @@ def list_records():
 @bp.route('/<record_id>', methods=['GET'])
 @jwt_required()
 def get_record(record_id):
-    claims = get_jwt()
-    is_admin = claims.get('role') == 'admin'
-    user_id = get_jwt_identity()
-    current_app.logger.info(f"DIAGNOSTIC: get_record ID: {record_id}, role: {claims.get('role')}, is_admin: {is_admin}, user_id: {user_id}")
     service = get_verification_service()
-    record = service.get_record(record_id, user_id=None)
+    record = service.get_record(record_id, user_id=_record_scope_user_id())
     return jsonify({
         "id": str(record.id),
         "status": record.status,
@@ -167,14 +169,21 @@ def get_certificate_file(record_id):
         raise AuthError(UNAUTHORIZED, "Missing authorization token")
         
     from flask_jwt_extended import decode_token
+    from .auth import is_token_revoked
     try:
-        decode_token(token)
+        decoded_token = decode_token(token)
     except Exception as e:
         from ..errors import AuthError, UNAUTHORIZED
         raise AuthError(UNAUTHORIZED, f"Invalid or expired token: {str(e)}")
+
+    if is_token_revoked(decoded_token):
+        from ..errors import AuthError, UNAUTHORIZED
+        raise AuthError(UNAUTHORIZED, "Token has been revoked")
         
     service = get_verification_service()
-    record = service.get_record(record_id, user_id=None)
+    user_id = decoded_token.get("sub")
+    is_admin = decoded_token.get("role") == "admin"
+    record = service.get_record(record_id, user_id=None if is_admin else user_id)
     
     upload_dir = current_app.config['UPLOAD_FOLDER']
     file_path = os.path.join(upload_dir, record.filename)
@@ -234,13 +243,13 @@ def get_certificate_file(record_id):
 @jwt_required()
 def get_stats():
     service = get_verification_service()
-    return jsonify(service.get_dashboard_stats()), 200
+    return jsonify(service.get_dashboard_stats(user_id=_record_scope_user_id())), 200
 
 @bp.route('/<record_id>/export', methods=['GET'])
 @jwt_required()
 def export_record(record_id):
     service = get_verification_service()
-    record = service.get_record(record_id, user_id=None)
+    record = service.get_record(record_id, user_id=_record_scope_user_id())
     return jsonify({
         "report_id": str(record.id),
         "status": record.status,

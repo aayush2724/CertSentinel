@@ -1,5 +1,3 @@
-import React from 'react';
-
 export default function Badge({ status }) {
   let styles = "bg-gray-100 text-gray-800";
   

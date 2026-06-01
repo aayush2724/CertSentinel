@@ -13,6 +13,8 @@ class CertificateClassifier:
     def get_instance(cls, model_path: str, thresholds: Optional[Dict[str, float]] = None):
         if cls._instance is None:
             cls._instance = cls(model_path, thresholds=thresholds)
+        elif thresholds is not None:
+            cls._instance.thresholds = thresholds
         return cls._instance
 
     def __init__(self, model_path: str = "", thresholds: Optional[Dict[str, float]] = None):

@@ -14,12 +14,54 @@ from ..repositories.audit_repository import AuditRepository
 bp = Blueprint('auth', __name__)
 # audit_repo will be initialized in the routes to ensure session context
 
-# Setup Redis for token blocklist
-try:
-    jwt_redis_blocklist = redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6379/0"))
-    jwt_redis_blocklist.ping()  # Test connection
-except Exception:
-    jwt_redis_blocklist = None
+_jwt_redis_blocklist = None
+_jwt_redis_url = None
+_memory_blocklist = set()
+
+def _blocklist_url():
+    try:
+        return current_app.config.get("JWT_BLOCKLIST_REDIS_URL")
+    except RuntimeError:
+        return os.environ.get("JWT_BLOCKLIST_REDIS_URL") or os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+
+def _blocklist_required():
+    try:
+        return bool(current_app.config.get("JWT_BLOCKLIST_REQUIRED", False))
+    except RuntimeError:
+        return False
+
+def _get_blocklist_client():
+    global _jwt_redis_blocklist, _jwt_redis_url
+    redis_url = _blocklist_url()
+    if _jwt_redis_blocklist is not None and _jwt_redis_url == redis_url:
+        return _jwt_redis_blocklist
+    try:
+        client = redis.from_url(redis_url)
+        client.ping()
+    except Exception as exc:
+        _jwt_redis_blocklist = None
+        _jwt_redis_url = redis_url
+        try:
+            current_app.logger.warning("JWT blocklist Redis unavailable: %s", exc)
+        except RuntimeError:
+            pass
+        return None
+    _jwt_redis_blocklist = client
+    _jwt_redis_url = redis_url
+    return client
+
+def is_token_revoked(jwt_payload):
+    jti = jwt_payload.get("jti")
+    if not jti:
+        return True
+
+    client = _get_blocklist_client()
+    if client:
+        return client.get(jti) is not None
+
+    if _blocklist_required():
+        return True
+    return jti in _memory_blocklist
 
 @bp.route('/register', methods=['POST'])
 def register():
@@ -27,12 +69,10 @@ def register():
     data = request.get_json(silent=True) or {}
     email = data.get('email')
     password = data.get('password')
-    role = data.get('role', 'viewer')
+    role = "viewer"
 
     if not email or not password:
         raise FileValidationError(VALIDATION_ERROR, "Email and password are required")
-    if role not in {"admin", "verifier", "viewer"}:
-        raise FileValidationError(VALIDATION_ERROR, "Invalid role", {"allowed": ["admin", "verifier", "viewer"]})
     if User.query.filter_by(email=email).first():
         raise FileValidationError(VALIDATION_ERROR, "Email already registered")
 
@@ -168,8 +208,13 @@ def update_profile():
 def logout():
     audit_repo = AuditRepository(db.session)
     jti = get_jwt()["jti"]
-    if jwt_redis_blocklist:
-        jwt_redis_blocklist.set(jti, "", ex=current_app.config["JWT_ACCESS_TOKEN_EXPIRES"])
+    client = _get_blocklist_client()
+    if client:
+        client.set(jti, "", ex=current_app.config["JWT_ACCESS_TOKEN_EXPIRES"])
+    elif _blocklist_required():
+        raise AuthError(UNAUTHORIZED, "Token revocation store is unavailable")
+    else:
+        _memory_blocklist.add(jti)
     
     user_id = get_jwt_identity()
     audit_repo.log(user_id, 'LOGOUT', ip_address=request.remote_addr)

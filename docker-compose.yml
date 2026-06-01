@@ -19,8 +19,10 @@ services:
     volumes:
       - ./backend:/app
     environment:
+      - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - JWT_BLOCKLIST_REDIS_URL=redis://redis:6379/0
       - DATABASE_URL=postgresql://certsentinel:password@db:5432/certsentinel
     depends_on:
       - redis
@@ -29,6 +31,12 @@ services:
   worker:
     build: ./backend
     command: celery -A celery_worker.celery_app worker --loglevel=info
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - JWT_BLOCKLIST_REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://certsentinel:password@db:5432/certsentinel
     depends_on:
       - redis
       - db

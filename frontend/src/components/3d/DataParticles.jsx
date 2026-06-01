@@ -1,6 +1,5 @@
-import React, { useRef, useMemo } from 'react';
+import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import * as THREE from 'three';
 
 export default function DataParticles() {
   const pointsRef = useRef();
@@ -9,9 +8,12 @@ export default function DataParticles() {
   const positions = useMemo(() => {
     const pos = new Float32Array(particlesCount * 3);
     for (let i = 0; i < particlesCount; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 12;
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 8;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 4;
+      const seed = Math.sin(i * 12.9898) * 43758.5453;
+      const seed2 = Math.sin((i + 17) * 78.233) * 24634.6345;
+      const seed3 = Math.sin((i + 43) * 37.719) * 13515.8732;
+      pos[i * 3] = (seed - Math.floor(seed) - 0.5) * 12;
+      pos[i * 3 + 1] = (seed2 - Math.floor(seed2) - 0.5) * 8;
+      pos[i * 3 + 2] = (seed3 - Math.floor(seed3) - 0.5) * 4;
     }
     return pos;
   }, [particlesCount]);

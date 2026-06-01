@@ -11,6 +11,7 @@ const History = lazy(() => import('./pages/History'));
 const CommandCenter = lazy(() => import('./pages/CommandCenter'));
 const AnalysisEngine = lazy(() => import('./pages/AnalysisEngine'));
 const VerificationVault = lazy(() => import('./pages/VerificationVault'));
+const ForensicReport = lazy(() => import('./pages/ForensicReport'));
 const Profile = lazy(() => import('./pages/Profile'));
 
 const pageVariants = {
@@ -52,6 +53,15 @@ function AnimatedRoutes() {
             <motion.div {...pageVariants}>
               <Suspense fallback={<PageLoader />}>
                 <CommandCenter />
+              </Suspense>
+            </motion.div>
+          </ProtectedRoute>
+        } />
+        <Route path="/forensic-report" element={
+          <ProtectedRoute requiredRole="verifier">
+            <motion.div {...pageVariants}>
+              <Suspense fallback={<PageLoader />}>
+                <ForensicReport />
               </Suspense>
             </motion.div>
           </ProtectedRoute>

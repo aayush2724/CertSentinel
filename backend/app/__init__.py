@@ -16,31 +16,25 @@ jwt = JWTManager()
 bcrypt = Bcrypt()
 
 def _seed_default_users(app):
-    """Create default admin and verifier users if they don't exist."""
+    """Create optional development users from environment-provided credentials."""
     from .models import User
+    seed_users = [
+        ("admin@medverify.dev", os.environ.get("MEDVERIFY_SEED_ADMIN_PASSWORD"), "admin"),
+        ("verifier@medverify.dev", os.environ.get("MEDVERIFY_SEED_VERIFIER_PASSWORD"), "verifier"),
+        ("viewer@medverify.dev", os.environ.get("MEDVERIFY_SEED_VIEWER_PASSWORD"), "viewer"),
+    ]
+    if not any(password for _, password, _ in seed_users):
+        app.logger.info('Default user seeding skipped; no seed passwords configured.')
+        return
+
     try:
-        # Seed medverify.dev users for consistent branding
-        if not User.query.filter_by(email='admin@medverify.dev').first():
-            admin_mv = User(
-                email='admin@medverify.dev',
-                password_hash=bcrypt.generate_password_hash('admin123').decode('utf-8'),
-                role='admin'
-            )
-            db.session.add(admin_mv)
-        if not User.query.filter_by(email='verifier@medverify.dev').first():
-            verifier_mv = User(
-                email='verifier@medverify.dev',
-                password_hash=bcrypt.generate_password_hash('verifier123').decode('utf-8'),
-                role='verifier'
-            )
-            db.session.add(verifier_mv)
-        if not User.query.filter_by(email='viewer@medverify.dev').first():
-            viewer_mv = User(
-                email='viewer@medverify.dev',
-                password_hash=bcrypt.generate_password_hash('viewer123').decode('utf-8'),
-                role='viewer'
-            )
-            db.session.add(viewer_mv)
+        for email, password, role in seed_users:
+            if password and not User.query.filter_by(email=email).first():
+                db.session.add(User(
+                    email=email,
+                    password_hash=bcrypt.generate_password_hash(password).decode('utf-8'),
+                    role=role,
+                ))
             
         db.session.commit()
         app.logger.info('Default users verified/created.')
@@ -55,7 +49,12 @@ def celery_init_app(app: Flask) -> Celery:
                 return self.run(*args, **kwargs)
 
     celery_app = Celery(app.name, task_cls=FlaskTask)
-    celery_app.config_from_object(app.config, silent=True, namespace='CELERY')
+    celery_app.conf.update(
+        broker_url=app.config["CELERY_BROKER_URL"],
+        result_backend=app.config["CELERY_RESULT_BACKEND"],
+        task_always_eager=app.config.get("CELERY_TASK_ALWAYS_EAGER", False),
+        task_eager_propagates=app.config.get("CELERY_TASK_EAGER_PROPAGATES", False),
+    )
     celery_app.set_default()
     app.extensions["celery"] = celery_app
     return celery_app
@@ -73,6 +72,11 @@ def create_app(config_class=DevelopmentConfig):
     celery_init_app(app)
     limiter.init_app(app)
     jwt.init_app(app)
+
+    @jwt.token_in_blocklist_loader
+    def check_if_token_revoked(jwt_header, jwt_payload):
+        from .routes.auth import is_token_revoked
+        return is_token_revoked(jwt_payload)
     
     # Ensure upload directory exists
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)

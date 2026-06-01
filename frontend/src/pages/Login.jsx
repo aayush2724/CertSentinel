@@ -123,18 +123,18 @@ export default function Login() {
             Secure forensic environment. Authorized access only.
           </p>
           <div className="bg-surface-container-low border border-outline-variant/20 rounded-2xl p-4 space-y-2 text-left font-body-sm">
-            <p className="font-bold text-text-secondary text-[11px] uppercase tracking-wider mb-1">Available Demo Accounts</p>
+            <p className="font-bold text-text-secondary text-[11px] uppercase tracking-wider mb-1">Seeded Account Emails</p>
             <div className="flex justify-between text-xs text-text-tertiary">
               <span>Admin:</span>
-              <span className="font-bold text-primary">admin@medverify.dev / admin123</span>
+              <span className="font-bold text-primary">admin@medverify.dev</span>
             </div>
             <div className="flex justify-between text-xs text-text-tertiary">
               <span>Verifier:</span>
-              <span className="font-bold text-primary">verifier@medverify.dev / verifier123</span>
+              <span className="font-bold text-primary">verifier@medverify.dev</span>
             </div>
             <div className="flex justify-between text-xs text-text-tertiary">
               <span>Viewer:</span>
-              <span className="font-bold text-primary">viewer@medverify.dev / viewer123</span>
+              <span className="font-bold text-primary">viewer@medverify.dev</span>
             </div>
           </div>
         </div>
@@ -142,4 +142,3 @@ export default function Login() {
     </div>
   );
 }
-

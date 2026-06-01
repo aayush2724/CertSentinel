@@ -1,8 +1,7 @@
-import React, { useRef, useMemo } from 'react';
+import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useSpring, animated } from '@react-spring/three';
 import { OrbitControls } from '@react-three/drei';
-import * as THREE from 'three';
 
 const VERDICT_COLORS = {
   GENUINE: { color: '#f0fdfb', emissive: '#0d9488' },

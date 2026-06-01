@@ -17,37 +17,30 @@ def seed_data():
     bcrypt = Bcrypt(app)
     
     with app.app_context():
-        # Create admin user (medverify.dev)
-        admin_mv = User.query.filter_by(email='admin@medverify.dev').first()
-        if not admin_mv:
-            admin_mv = User(
-                email='admin@medverify.dev',
-                password_hash=bcrypt.generate_password_hash('admin123').decode('utf-8'),
-                role='admin'
+        seed_users = [
+            ("admin@medverify.dev", os.environ.get("MEDVERIFY_SEED_ADMIN_PASSWORD"), "admin"),
+            ("verifier@medverify.dev", os.environ.get("MEDVERIFY_SEED_VERIFIER_PASSWORD"), "verifier"),
+            ("viewer@medverify.dev", os.environ.get("MEDVERIFY_SEED_VIEWER_PASSWORD"), "viewer"),
+        ]
+        if not any(password for _, password, _ in seed_users):
+            raise RuntimeError(
+                "Set MEDVERIFY_SEED_ADMIN_PASSWORD, MEDVERIFY_SEED_VERIFIER_PASSWORD, "
+                "or MEDVERIFY_SEED_VIEWER_PASSWORD before seeding users."
             )
-            db.session.add(admin_mv)
-        
-        # Create verifier user (medverify.dev)
-        verifier_mv = User.query.filter_by(email='verifier@medverify.dev').first()
-        if not verifier_mv:
-            verifier_mv = User(
-                email='verifier@medverify.dev',
-                password_hash=bcrypt.generate_password_hash('verifier123').decode('utf-8'),
-                role='verifier'
-            )
-            db.session.add(verifier_mv)
 
-        # Create viewer user (medverify.dev)
-        viewer_mv = User.query.filter_by(email='viewer@medverify.dev').first()
-        if not viewer_mv:
-            viewer_mv = User(
-                email='viewer@medverify.dev',
-                password_hash=bcrypt.generate_password_hash('viewer123').decode('utf-8'),
-                role='viewer'
-            )
-            db.session.add(viewer_mv)
+        for email, password, role in seed_users:
+            if password and not User.query.filter_by(email=email).first():
+                db.session.add(User(
+                    email=email,
+                    password_hash=bcrypt.generate_password_hash(password).decode('utf-8'),
+                    role=role,
+                ))
         
         db.session.commit()
+
+        verifier_mv = User.query.filter_by(email='verifier@medverify.dev').first()
+        if not verifier_mv:
+            raise RuntimeError("A verifier user is required for sample verification records.")
         
         # Clear existing verification records and audit logs to prevent duplicates
         VerificationRecord.query.delete()

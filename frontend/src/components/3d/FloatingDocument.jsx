@@ -1,7 +1,7 @@
-import React, { useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGesture } from '@use-gesture/react';
-import { MathUtils, CanvasTexture } from 'three';
+import { CanvasTexture } from 'three';
 import { useSpring, animated } from '@react-spring/three';
 
 export default function FloatingDocument() {

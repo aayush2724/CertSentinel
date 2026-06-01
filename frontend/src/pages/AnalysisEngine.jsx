@@ -2,10 +2,11 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../hooks/useAuth';
+import { certificateAPI } from '../services/api';
 
 export default function AnalysisEngine() {
   const navigate = useNavigate();
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const fileInputRef = useRef(null);
 
   const [file, setFile] = useState(null);
@@ -50,16 +51,11 @@ export default function AnalysisEngine() {
     try {
       const formData = new FormData();
       formData.append('certificate', file);
-      const res = await fetch('/api/certificates/verify', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Verification failed');
+      const res = await certificateAPI.verify(formData);
+      const data = res.data;
       navigate(`/report/${data.record_id || data.data?.id || data.id}`);
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || err.message || 'Verification failed');
     } finally {
       setUploading(false);
     }

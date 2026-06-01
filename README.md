@@ -63,15 +63,15 @@ npm run dev
 
 ---
 
-## 🔐 Developer Credentials Cheat Sheet
+## 🔐 Developer Accounts
 
-Use these ready-made credentials to log in and inspect different role capabilities in the system:
+Set these optional environment variables before starting or seeding the app to create local development users:
 
-| Role | Email | Password | Access Capabilities |
+| Role | Email | Password Environment Variable | Access Capabilities |
 | :--- | :--- | :--- | :--- |
-| **System Admin** | `admin@medverify.dev` | `admin123` | Unrestricted full-ledger read/write, Command Center metrics, audit history |
-| **Verifier** | `verifier@medverify.dev` | `verifier123` | Access to Analysis Engine (upload), Vault ledger list, individual diagnostic reports |
-| **Viewer** | `viewer@medverify.dev` | `viewer123` | Read-only access to ledger list, individual report previews, profile identity terminal |
+| **System Admin** | `admin@medverify.dev` | `MEDVERIFY_SEED_ADMIN_PASSWORD` | Unrestricted full-ledger read/write, Command Center metrics, audit history |
+| **Verifier** | `verifier@medverify.dev` | `MEDVERIFY_SEED_VERIFIER_PASSWORD` | Access to Analysis Engine (upload), Vault ledger list, individual diagnostic reports |
+| **Viewer** | `viewer@medverify.dev` | `MEDVERIFY_SEED_VIEWER_PASSWORD` | Read-only access to ledger list, individual report previews, profile identity terminal |
 
 ---
 
